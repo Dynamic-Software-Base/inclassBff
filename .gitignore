@@ -1,0 +1,27 @@
+﻿# Build artifacts
+**/bin/
+**/obj/
+
+# Rider / IntelliJ
+.idea/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Test and coverage
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# NuGet
+*.nupkg
+*.snupkg
+
+# OS generated files
+.DS_Store
+Thumbs.db
