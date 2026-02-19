@@ -10,6 +10,11 @@ variables:
   azureServiceConnection: YOUR-AZURE-SERVICE-CONNECTION
   webAppName: YOUR-AZURE-WEBAPP-NAME
   webAppKind: webApp
+  healthCheckPath: /
+  healthCheckProtocol: https
+  healthCheckRetries: 12
+  healthCheckDelaySeconds: 10
+  healthCheckExpectedCodes: 200,204,301,302
 
 stages:
 - stage: Build
@@ -75,3 +80,43 @@ stages:
               appType: $(webAppKind)
               appName: $(webAppName)
               package: $(Pipeline.Workspace)/drop/**/*.zip
+
+          - task: PowerShell@2
+            displayName: Pipeline health check
+            inputs:
+              targetType: inline
+              script: |
+                $healthUrl = "$(healthCheckProtocol)://$(webAppName).azurewebsites.net$(healthCheckPath)"
+                $retries = [int]"$(healthCheckRetries)"
+                $delaySeconds = [int]"$(healthCheckDelaySeconds)"
+                $expectedCodes = "$(healthCheckExpectedCodes)".Split(',') | ForEach-Object { [int]$_.Trim() }
+
+                Write-Host "Health check URL: $healthUrl"
+                Write-Host "Expected codes: $($expectedCodes -join ', ')"
+
+                for ($attempt = 1; $attempt -le $retries; $attempt++) {
+                  try {
+                    $response = Invoke-WebRequest -Uri $healthUrl -Method GET -TimeoutSec 20 -MaximumRedirection 5
+                    $statusCode = [int]$response.StatusCode
+                    Write-Host "Attempt $attempt/$retries returned HTTP $statusCode"
+                  } catch {
+                    if ($_.Exception.Response) {
+                      $statusCode = [int]$_.Exception.Response.StatusCode.value__
+                      Write-Host "Attempt $attempt/$retries returned HTTP $statusCode"
+                    } else {
+                      $statusCode = -1
+                      Write-Host "Attempt $attempt/$retries failed: $($_.Exception.Message)"
+                    }
+                  }
+
+                  if ($expectedCodes -contains $statusCode) {
+                    Write-Host "Health check passed."
+                    exit 0
+                  }
+
+                  if ($attempt -lt $retries) {
+                    Start-Sleep -Seconds $delaySeconds
+                  }
+                }
+
+                throw "Health check failed after $retries attempts. URL: $healthUrl"
