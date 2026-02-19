@@ -3,17 +3,13 @@
     include:
       - main
 
-pr:
-  branches:
-    include:
-      - main
-
 variables:
   buildConfiguration: Release
   dotNetSdkVersion: 10.x
   projectPath: src/InClassBff.Api/InClassBFF.Api.csproj
   azureServiceConnection: YOUR-AZURE-SERVICE-CONNECTION
   webAppName: YOUR-AZURE-WEBAPP-NAME
+  webAppKind: webApp
 
 stages:
 - stage: Build
@@ -61,7 +57,7 @@ stages:
 - stage: Deploy
   displayName: Deploy to Azure Web App
   dependsOn: Build
-  condition: succeeded()
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
   jobs:
   - deployment: DeployWebApp
     displayName: Deploy
@@ -76,6 +72,6 @@ stages:
             displayName: Azure Web App Deploy
             inputs:
               azureSubscription: $(azureServiceConnection)
-              appType: webApp
+              appType: $(webAppKind)
               appName: $(webAppName)
               package: $(Pipeline.Workspace)/drop/**/*.zip
