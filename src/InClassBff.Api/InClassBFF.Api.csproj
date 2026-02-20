@@ -6,6 +6,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <Target Name="StopRunningApiBeforeBuild"
+          BeforeTargets="Build"
+          Condition="'$(OS)' == 'Windows_NT' and '$(Configuration)' == 'Debug'">
+    <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command &quot;$p = Get-Process -Name '$(AssemblyName)' -ErrorAction SilentlyContinue; foreach ($proc in $p) { try { Stop-Process -Id $proc.Id -Force -ErrorAction Stop } catch {} }; exit 0&quot;"
+          IgnoreExitCode="true"
+          StandardOutputImportance="Low"
+          StandardErrorImportance="Low" />
+  </Target>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Cookies" Version="2.3.9" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.3" />
