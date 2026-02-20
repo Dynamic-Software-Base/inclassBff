@@ -7,8 +7,8 @@ variables:
   buildConfiguration: Release
   dotNetSdkVersion: 10.x
   projectPath: src/InClassBff.Api/InClassBFF.Api.csproj
-  azureServiceConnection: YOUR-AZURE-SERVICE-CONNECTION
-  webAppName: YOUR-AZURE-WEBAPP-NAME
+  azureServiceConnection: 'inclass-azure-service-collection'
+  webAppName: 'inclass-bff'
   webAppKind: webApp
   healthCheckPath: /
   healthCheckProtocol: https
@@ -68,7 +68,7 @@ stages:
     displayName: Deploy
     environment: production
     pool:
-      vmImage: windows-latest
+      name: 'Default'
     strategy:
       runOnce:
         deploy:
