@@ -9,8 +9,9 @@ variables:
   projectPath: src/InClassBff.Api/InClassBFF.Api.csproj
   azureServiceConnection: 'inclass-azure-service-collection'
   webAppName: 'inclass-bff'
+  webAppHostName: ''
   webAppKind: webApp
-  healthCheckPath: /
+  healthCheckPath: /health
   healthCheckProtocol: https
   healthCheckRetries: 12
   healthCheckDelaySeconds: 10
@@ -86,7 +87,11 @@ stages:
             inputs:
               targetType: inline
               script: |
-                $healthUrl = "$(healthCheckProtocol)://$(webAppName).azurewebsites.net$(healthCheckPath)"
+                $hostName = "$(webAppHostName)"
+                if ([string]::IsNullOrWhiteSpace($hostName)) {
+                  $hostName = "$(webAppName).azurewebsites.net"
+                }
+                $healthUrl = "$(healthCheckProtocol)://$hostName$(healthCheckPath)"
                 $retries = [int]"$(healthCheckRetries)"
                 $delaySeconds = [int]"$(healthCheckDelaySeconds)"
                 $expectedCodes = "$(healthCheckExpectedCodes)".Split(',') | ForEach-Object { [int]$_.Trim() }
