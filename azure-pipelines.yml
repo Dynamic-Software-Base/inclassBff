@@ -3,128 +3,224 @@ trigger:
     include:
       - main
 
+# ─────────────────────────────────────────────
+# Link your Azure DevOps variable group here.
+# Create it under: Pipelines → Library → + Variable group
+# Name it "inclass-bff-vars" and add the variables listed below.
+# ─────────────────────────────────────────────
 variables:
-  buildConfiguration: Release
-  dotNetSdkVersion: 10.x
-  projectPath: src/InClassBff.Api/InClassBFF.Api.csproj
-  azureServiceConnection: 'inclass-azure-service-collection'
-  webAppName: 'inclass-bff'
-  webAppHostName: 'https://inclass-bff-bqg5g9d6caa9g4es.westeurope-01.azurewebsites.net/'
-  webAppKind: webApp
-  healthCheckPath: /health
-  healthCheckProtocol: https
-  healthCheckRetries: 12
-  healthCheckDelaySeconds: 10
-  healthCheckExpectedCodes: 200,204,301,302
+  - group: inclass-bff-vars          # pulls all variables from the group
+  - name: buildConfiguration
+    value: Release
+  - name: dotNetSdkVersion
+    value: 10.x
+  - name: projectPath
+    value: src/InClassBff.Api/InClassBFF.Api.csproj
+  - name: webAppKind
+    value: webApp
+  - name: healthCheckPath
+    value: /health
+  - name: healthCheckProtocol
+    value: https
+  - name: healthCheckRetries
+    value: 12
+  - name: healthCheckDelaySeconds
+    value: 10
+  - name: healthCheckExpectedCodes
+    value: '200,204,301,302'
+
+# ─────────────────────────────────────────────
+# Variable group "inclass-bff-vars" should contain:
+#
+#   AZURE_SERVICE_CONNECTION   → inclass-azure-service-collection
+#   WEB_APP_NAME               → inclass-bff
+#   WEB_APP_HOST_NAME          → inclass-bff-bqg5g9d6caa9g4es.westeurope-01.azurewebsites.net
+#   KEYCLOAK_CLIENT_SECRET     → <your secret>        (mark as secret 🔒)
+#   KEYCLOAK_AUTHORITY         → https://inclass-production.up.railway.app/realms/InClass
+#   KEYCLOAK_CLIENT_ID         → inclass-bff
+#   API_ADDRESS                → https://your-real-api.azurewebsites.net
+#   ALLOWED_CORS_ORIGINS       → https://green-island-0dfab5603.1.azurestaticapps.net
+#
+# Optional — if you use Azure Key Vault linking inside the variable group:
+#   Enable "Link secrets from an Azure key vault" in the group UI,
+#   point it at your KV, and add KEYCLOAK_CLIENT_SECRET as a mapped secret.
+#   The pipeline consumes it the same way — no code changes needed.
+# ─────────────────────────────────────────────
 
 stages:
-- stage: Build
-  displayName: Build and publish artifact
-  jobs:
-  - job: Build
-    pool:
-      name: 'Default'
-    steps:
-    - task: UseDotNet@2
-      displayName: Install .NET SDK $(dotNetSdkVersion)
-      inputs:
-        packageType: sdk
-        version: $(dotNetSdkVersion)
-
-    - task: DotNetCoreCLI@2
-      displayName: Restore
-      inputs:
-        command: restore
-        projects: $(projectPath)
-
-    - task: DotNetCoreCLI@2
-      displayName: Build
-      inputs:
-        command: build
-        projects: $(projectPath)
-        arguments: --configuration $(buildConfiguration) --no-restore
-
-    - task: DotNetCoreCLI@2
-      displayName: Publish
-      inputs:
-        command: publish
-        publishWebProjects: false
-        projects: $(projectPath)
-        arguments: --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)
-        zipAfterPublish: true
-
-    - task: PublishBuildArtifacts@1
-      displayName: Publish artifact
-      inputs:
-        PathtoPublish: $(Build.ArtifactStagingDirectory)
-        ArtifactName: drop
-        publishLocation: Container
-
-- stage: Deploy
-  displayName: Deploy to Azure Web App
-  dependsOn: Build
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
-  jobs:
-  - deployment: DeployWebApp
-    displayName: Deploy
-    environment: production
-    pool:
-      name: 'Default'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - task: AzureWebApp@1
-            displayName: Azure Web App Deploy
-            inputs:
-              azureSubscription: $(azureServiceConnection)
-              appType: $(webAppKind)
-              appName: $(webAppName)
-              package: $(Pipeline.Workspace)/drop/**/*.zip
-              appSettings: |
-                -ASPNETCORE_ENVIRONMENT Production
-                -ReverseProxy__Clusters__api-cluster__Destinations__api-destination__Address https://your-real-api.azurewebsites.net
-                -AllowedCorsOrigins https://green-island-0dfab5603.1.azurestaticapps.net
+  
+  # ═══════════════════════════════════════════════════════
+  # STAGE 1 – Build
+  # ═══════════════════════════════════════════════════════
+  - stage: Build
+    displayName: Build and publish artifact
+    jobs:
+      - job: Build
+        pool:
+          name: 'Default'
+        steps:
+          
+          # ── Debug: dump all env vars so you can verify what the agent sees ──────
           - task: PowerShell@2
-            displayName: Pipeline health check
+            displayName: '[DEBUG] Print environment variables'
             inputs:
               targetType: inline
               script: |
-                $hostName = "$(webAppHostName)"
-                if ([string]::IsNullOrWhiteSpace($hostName)) {
-                  $hostName = "$(webAppName).azurewebsites.net"
+                Write-Host "========================================"
+                Write-Host "  ENVIRONMENT VARIABLES ON BUILD AGENT"
+                Write-Host "========================================"
+                
+                # Print every env var that is NOT a secret.
+                # Secret variables are redacted by Azure DevOps automatically (shown as ***).
+                Get-ChildItem Env: | Sort-Object Name | ForEach-Object {
+                  Write-Host "$($_.Name) = $($_.Value)"
                 }
-                $healthUrl = "$(healthCheckProtocol)://$hostName$(healthCheckPath)"
-                $retries = [int]"$(healthCheckRetries)"
-                $delaySeconds = [int]"$(healthCheckDelaySeconds)"
-                $expectedCodes = "$(healthCheckExpectedCodes)".Split(',') | ForEach-Object { [int]$_.Trim() }
+                
+                Write-Host ""
+                Write-Host "========================================"
+                Write-Host "  PIPELINE VARIABLES (resolved)"
+                Write-Host "========================================"
+                Write-Host "buildConfiguration    = $(buildConfiguration)"
+                Write-Host "dotNetSdkVersion      = $(dotNetSdkVersion)"
+                Write-Host "projectPath           = $(projectPath)"
+                Write-Host "webAppName            = $(WEB_APP_NAME)"
+                Write-Host "webAppHostName        = $(WEB_APP_HOST_NAME)"
+                Write-Host "keycloakAuthority     = $(KEYCLOAK_AUTHORITY)"
+                Write-Host "keycloakClientId      = $(KEYCLOAK_CLIENT_ID)"
+                Write-Host "keycloakClientSecret  = ***  (secret - intentionally hidden)"
+                Write-Host "apiAddress            = $(API_ADDRESS)"
+                Write-Host "allowedCorsOrigins    = $(ALLOWED_CORS_ORIGINS)"
 
-                Write-Host "Health check URL: $healthUrl"
-                Write-Host "Expected codes: $($expectedCodes -join ', ')"
+          - task: UseDotNet@2
+            displayName: Install .NET SDK $(dotNetSdkVersion)
+            inputs:
+              packageType: sdk
+              version: $(dotNetSdkVersion)
 
-                for ($attempt = 1; $attempt -le $retries; $attempt++) {
-                  try {
-                    $response = Invoke-WebRequest -Uri $healthUrl -Method GET -TimeoutSec 20 -MaximumRedirection 5
-                    $statusCode = [int]$response.StatusCode
-                    Write-Host "Attempt $attempt/$retries returned HTTP $statusCode"
-                  } catch {
-                    if ($_.Exception.Response) {
-                      $statusCode = [int]$_.Exception.Response.StatusCode.value__
-                      Write-Host "Attempt $attempt/$retries returned HTTP $statusCode"
-                    } else {
-                      $statusCode = -1
-                      Write-Host "Attempt $attempt/$retries failed: $($_.Exception.Message)"
-                    }
-                  }
+          - task: DotNetCoreCLI@2
+            displayName: Restore
+            inputs:
+              command: restore
+              projects: $(projectPath)
 
-                  if ($expectedCodes -contains $statusCode) {
-                    Write-Host "Health check passed."
-                    exit 0
-                  }
+          - task: DotNetCoreCLI@2
+            displayName: Build
+            inputs:
+              command: build
+              projects: $(projectPath)
+              arguments: --configuration $(buildConfiguration) --no-restore
 
-                  if ($attempt -lt $retries) {
-                    Start-Sleep -Seconds $delaySeconds
-                  }
-                }
+          - task: DotNetCoreCLI@2
+            displayName: Publish
+            inputs:
+              command: publish
+              publishWebProjects: false
+              projects: $(projectPath)
+              arguments: --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)
+              zipAfterPublish: true
 
-                throw "Health check failed after $retries attempts. URL: $healthUrl"
+          - task: PublishBuildArtifacts@1
+            displayName: Publish artifact
+            inputs:
+              PathtoPublish: $(Build.ArtifactStagingDirectory)
+              ArtifactName: drop
+              publishLocation: Container
+  
+  # ═══════════════════════════════════════════════════════
+  # STAGE 2 – Deploy
+  # ═══════════════════════════════════════════════════════
+  - stage: Deploy
+    displayName: Deploy to Azure Web App
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: DeployWebApp
+        displayName: Deploy
+        environment: production
+        pool:
+          name: 'Default'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                
+                # ── Debug: confirm variables are visible in the deploy stage too ──
+                - task: PowerShell@2
+                  displayName: '[DEBUG] Confirm deploy-stage variables'
+                  inputs:
+                    targetType: inline
+                    script: |
+                      Write-Host "========================================"
+                      Write-Host "  DEPLOY STAGE – VARIABLE SPOT CHECK"
+                      Write-Host "========================================"
+                      Write-Host "azureServiceConnection = $(AZURE_SERVICE_CONNECTION)"
+                      Write-Host "webAppName             = $(WEB_APP_NAME)"
+                      Write-Host "webAppHostName         = $(WEB_APP_HOST_NAME)"
+                      Write-Host "keycloakAuthority      = $(KEYCLOAK_AUTHORITY)"
+                      Write-Host "keycloakClientId       = $(KEYCLOAK_CLIENT_ID)"
+                      Write-Host "keycloakClientSecret   = ***  (secret)"
+                      Write-Host "apiAddress             = $(API_ADDRESS)"
+                      Write-Host "allowedCorsOrigins     = $(ALLOWED_CORS_ORIGINS)"
+                      Write-Host "ASPNETCORE_ENVIRONMENT = Production (set via appSettings below)"
+
+                - task: AzureWebApp@1
+                  displayName: Azure Web App Deploy
+                  inputs:
+                    azureSubscription: $(AZURE_SERVICE_CONNECTION)
+                    appType: $(webAppKind)
+                    appName: $(WEB_APP_NAME)
+                    package: $(Pipeline.Workspace)/drop/**/*.zip
+                    # All sensitive values come from the variable group.
+                    # Azure App Service reads these as environment variables,
+                    # which override anything in appsettings.json / appsettings.Production.json.
+                    appSettings: >-
+                      -ASPNETCORE_ENVIRONMENT Production
+                      -Keycloak__Authority $(KEYCLOAK_AUTHORITY)
+                      -Keycloak__ClientId $(KEYCLOAK_CLIENT_ID)
+                      -Keycloak__ClientSecret $(KEYCLOAK_CLIENT_SECRET)
+                      -ReverseProxy__Clusters__api-cluster__Destinations__api-destination__Address $(API_ADDRESS)
+                      -AllowedCorsOrigins $(ALLOWED_CORS_ORIGINS)
+
+                - task: PowerShell@2
+                  displayName: Pipeline health check
+                  inputs:
+                    targetType: inline
+                    script: |
+                      $hostName = "$(WEB_APP_HOST_NAME)"
+                      if ([string]::IsNullOrWhiteSpace($hostName)) {
+                        $hostName = "$(WEB_APP_NAME).azurewebsites.net"
+                      }
+                      $healthUrl = "$(healthCheckProtocol)://$hostName$(healthCheckPath)"
+                      $retries = [int]"$(healthCheckRetries)"
+                      $delaySeconds = [int]"$(healthCheckDelaySeconds)"
+                      $expectedCodes = "$(healthCheckExpectedCodes)".Split(',') | ForEach-Object { [int]$_.Trim() }
+                      
+                      Write-Host "Health check URL: $healthUrl"
+                      Write-Host "Expected codes: $($expectedCodes -join ', ')"
+                      
+                      for ($attempt = 1; $attempt -le $retries; $attempt++) {
+                        try {
+                          $response = Invoke-WebRequest -Uri $healthUrl -Method GET -TimeoutSec 20 -MaximumRedirection 5
+                          $statusCode = [int]$response.StatusCode
+                          Write-Host "Attempt $attempt/$retries returned HTTP $statusCode"
+                        } catch {
+                          if ($_.Exception.Response) {
+                            $statusCode = [int]$_.Exception.Response.StatusCode.value__
+                            Write-Host "Attempt $attempt/$retries returned HTTP $statusCode"
+                          } else {
+                            $statusCode = -1
+                            Write-Host "Attempt $attempt/$retries failed: $($_.Exception.Message)"
+                          }
+                        }
+                      
+                        if ($expectedCodes -contains $statusCode) {
+                          Write-Host "Health check passed."
+                          exit 0
+                        }
+                      
+                        if ($attempt -lt $retries) {
+                          Start-Sleep -Seconds $delaySeconds
+                        }
+                      }
+                      
+                      throw "Health check failed after $retries attempts. URL: $healthUrl"
