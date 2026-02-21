@@ -13,7 +13,7 @@ builder.Services.AddDataProtection()
     .SetApplicationName("inclass-bff");
 builder.WebHost.ConfigureKestrel(options =>
 {
-    options.Limits.MaxRequestHeadersTotalSize = 65536; 
+    options.Limits.MaxRequestHeadersTotalSize = 65536; // 64KB
 });
 builder.Services.AddCors(options =>
 {
@@ -108,7 +108,10 @@ app.UseAuthorization();
 
 app.MapGet("/", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
-
+app.MapGet("/debug/config", (IConfiguration config) => new {
+    AllowedCorsOrigins = config["AllowedCorsOrigins"],
+    Environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+});
 app.MapReverseProxy().RequireAuthorization();
 app.MapControllers();
 
