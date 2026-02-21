@@ -49,7 +49,7 @@ public class AuthController : ControllerBase
         return SignOut(
             new AuthenticationProperties
             {
-                RedirectUri = "/"
+                RedirectUri = _allowedOrigins[0]
             },
             CookieAuthenticationDefaults.AuthenticationScheme,
             OpenIdConnectDefaults.AuthenticationScheme
