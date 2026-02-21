@@ -2,12 +2,19 @@ using System.Net.Http.Headers;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Yarp.ReverseProxy.Transforms;
 
 var builder = WebApplication.CreateBuilder(args);
 var allowedCorsOrigins = ParseOrigins(builder.Configuration["AllowedCorsOrigins"]);
-
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo("/home/DataProtectionKeys"))
+    .SetApplicationName("inclass-bff");
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestHeadersTotalSize = 65536; 
+});
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Angular", policy =>
@@ -54,7 +61,7 @@ builder.Services.AddAuthentication(options =>
     options.ClientId = keycloakConfig["ClientId"];
     options.ClientSecret = keycloakConfig["ClientSecret"];
     options.ResponseType = OpenIdConnectResponseType.Code;
-    options.SaveTokens = true;
+    options.SaveTokens = false;
     options.GetClaimsFromUserInfoEndpoint = true;
     options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
 
