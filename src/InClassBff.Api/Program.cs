@@ -12,16 +12,6 @@ using Yarp.ReverseProxy.Transforms;
 var builder = WebApplication.CreateBuilder(args);
 var allowedCorsOrigins = ParseOrigins(builder.Configuration["AllowedCorsOrigins"]);
 
-// ── Data Protection ────────────────────────────────────────────────────────────
-builder.Services.AddDataProtection()
-    .PersistKeysToFileSystem(new DirectoryInfo("/home/DataProtectionKeys"))
-    .SetApplicationName("inclass-bff");
-
-builder.WebHost.ConfigureKestrel(options =>
-{
-    options.Limits.MaxRequestHeadersTotalSize = 65536;
-});
-
 // ── Memory Cache + Ticket Store ────────────────────────────────────────────────
 // IMPORTANT: Register IMemoryCache before InMemoryTicketStore
 builder.Services.AddMemoryCache();
@@ -51,7 +41,7 @@ builder.Services.AddAuthentication(options =>
     options.Cookie.Name = "inclass.session";
     options.Cookie.HttpOnly = true;
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-    options.Cookie.SameSite = SameSiteMode.None; 
+    options.Cookie.SameSite = SameSiteMode.Lax; 
     options.Cookie.Path = "/";
     options.ExpireTimeSpan = TimeSpan.FromHours(8);
     options.SlidingExpiration = true;
@@ -152,7 +142,8 @@ builder.Services.AddReverseProxy()
 builder.Services.AddControllers();
 
 var app = builder.Build();
-
+app.UseDefaultFiles();        // serves index.html for /
+app.UseStaticFiles();         // serves JS/CSS/assets from wwwroot
 // ── Middleware pipeline ────────────────────────────────────────────────────────
 // Order matters: CORS must come before Auth
 app.UseCors("Angular");
@@ -169,7 +160,7 @@ app.MapGet("/debug/config", (IConfiguration config) => new
 
 app.MapReverseProxy().RequireAuthorization();
 app.MapControllers();
-
+app.MapFallbackToFile("index.html"); // MUST be last — handles Angular routing
 app.Run();
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
