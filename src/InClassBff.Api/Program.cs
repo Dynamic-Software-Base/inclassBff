@@ -51,7 +51,8 @@ builder.Services.AddAuthentication(options =>
     options.Cookie.Name = "inclass.session";
     options.Cookie.HttpOnly = true;
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-    options.Cookie.SameSite = SameSiteMode.None;  // Required for cross-origin
+    options.Cookie.SameSite = SameSiteMode.None; 
+    options.Cookie.Path = "/";
     options.ExpireTimeSpan = TimeSpan.FromHours(8);
     options.SlidingExpiration = true;
 
