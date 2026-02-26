@@ -150,7 +150,6 @@ app.UseCors("Angular");
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
 app.MapGet("/debug/config", (IConfiguration config) => new
 {

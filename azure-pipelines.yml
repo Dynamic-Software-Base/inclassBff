@@ -75,28 +75,6 @@ stages:
                 Write-Host "apiAddress            = $(API_ADDRESS)"
                 Write-Host "allowedCorsOrigins    = $(ALLOWED_CORS_ORIGINS)"
 
-          # ── Verify wwwroot was committed by Angular pipeline ─────────
-          # The Angular GitHub Actions pipeline commits the built dist/
-          # into this repo's wwwroot/ folder before this pipeline runs.
-          # This step confirms Angular files are present before building.
-          - task: PowerShell@2
-            displayName: '[CHECK] Verify Angular wwwroot files exist'
-            inputs:
-              targetType: inline
-              script: |
-                $wwwroot = "$(Build.SourcesDirectory)/wwwroot"
-                if (!(Test-Path $wwwroot)) {
-                  Write-Error "wwwroot folder not found. Has the Angular pipeline pushed the build yet?"
-                  exit 1
-                }
-                $files = Get-ChildItem $wwwroot -Recurse | Measure-Object
-                Write-Host "wwwroot exists with $($files.Count) files."
-                if ($files.Count -eq 0) {
-                  Write-Error "wwwroot is empty. Angular build may not have been pushed."
-                  exit 1
-                }
-                Write-Host "Angular files verified OK."
-
           - task: UseDotNet@2
             displayName: Install .NET SDK $(dotNetSdkVersion)
             inputs:
