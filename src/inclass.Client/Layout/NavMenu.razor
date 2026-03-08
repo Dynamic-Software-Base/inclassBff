@@ -1,0 +1,168 @@
+﻿@using inclass.Client.Components
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+<Container>
+    <header class="flex flex-col lg:flex-row justify-between items-center my-5">
+
+        <!-- Top bar: logo + mobile menu button -->
+        <div class="flex w-full lg:w-auto items-center justify-between">
+            <NavLink href="/" class="text-lg">
+                <span class="font-bold text-slate-800">Astro</span>
+                <span class="text-slate-500">ship</span>
+            </NavLink>
+
+            <button type="button"
+                    class="block lg:hidden p-2"
+                    aria-label="Toggle menu"
+                    @onclick="ToggleMobile">
+                <!-- simple hamburger icon -->
+                <svg class="w-5 h-5 text-gray-800" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
+        </div>
+
+        <!-- Menu items -->
+        <nav class="@MenuClass">
+            <ul class="flex flex-col lg:flex-row lg:gap-3">
+                @for (var i = 0; i < MenuItems.Count; i++)
+                {
+                    var item = MenuItems[i];
+
+                    if (item.Children?.Count > 0)
+                    {
+                        <li class="relative">
+                            <button type="button"
+                                    class="flex lg:px-3 py-2 items-center text-gray-600 hover:text-gray-900"
+                                    @onclick="() => ToggleDropdown(item.Title)">
+                                <span>@item.Title</span>
+                                <svg class="ml-1 w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd"
+                                          d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"
+                                          clip-rule="evenodd" />
+                                </svg>
+                            </button>
+
+                            @if (_openDropdown == item.Title)
+                            {
+                                <div class="lg:absolute lg:mt-2 lg:min-w-55 bg-white border border-slate-200 rounded-lg shadow-sm p-2">
+                                    @foreach (var child in item.Children)
+                                    {
+                                        <NavLink href="@child.Path"
+                                                 class="block px-3 py-2 rounded-md text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                                                 @onclick="CloseAll">
+                                            @child.Title
+                                        </NavLink>
+                                    }
+                                </div>
+                            }
+                        </li>
+                    }
+                    else
+                    {
+                        <li>
+                            <NavLink href="@item.Path"
+                                     class="flex lg:px-3 py-2 items-center text-gray-600 hover:text-gray-900"
+                                     @onclick="CloseAll"
+                                     Match="NavLinkMatch.All">
+                                <span>@item.Title</span>
+
+                                @if (item.Badge)
+                                {
+                                    <span class="ml-1 px-2 py-0.5 text-[10px] animate-pulse font-semibold uppercase text-white bg-indigo-600 rounded-full">
+                                        New
+                                    </span>
+                                }
+                            </NavLink>
+                        </li>
+                    }
+                }
+            </ul>
+
+            <!-- Mobile auth buttons -->
+            <div class="lg:hidden flex items-center mt-3 gap-4">
+                <a href="#" class="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold bg-indigo-600 text-white">Log in</a>
+
+            </div>
+        </nav>
+
+        <!-- Desktop auth buttons -->
+        <div class="hidden lg:flex items-center gap-4">
+            <button @onclick="SignIn" class="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold bg-indigo-600 text-white">Log in</button>
+        </div>
+    </header>
+</Container>
+
+@code {
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            Navigation.NavigateTo("/dashboard");
+        }
+    }
+
+
+    private bool _isMobileOpen;
+    private string? _openDropdown;
+
+    private string MenuClass =>
+        _isMobileOpen
+            ? "w-full lg:w-auto mt-2 lg:flex lg:mt-0"
+            : "hidden w-full lg:w-auto mt-2 lg:flex lg:mt-0";
+
+    private void ToggleMobile()
+    {
+        _isMobileOpen = !_isMobileOpen;
+        if (!_isMobileOpen) _openDropdown = null;
+    }
+
+    private void ToggleDropdown(string key)
+        => _openDropdown = (_openDropdown == key) ? null : key;
+
+    private void CloseAll()
+    {
+        _isMobileOpen = false;
+        _openDropdown = null;
+    }
+
+    private List<MenuItem> MenuItems { get; } =
+    [
+        new MenuItem("Features", "#")
+        {
+            Children =
+            [
+                new MenuChild("Action", "/"),
+                new MenuChild("Another action", "#"),
+                new MenuChild("Dropdown Submenu", "#"),
+                new MenuChild("404 Page", "/404"),
+            ]
+        },
+        new MenuItem("Pricing", "/pricing"),
+        new MenuItem("About", "/about"),
+        new MenuItem("Contact", "/contact"),
+        new MenuItem("Pro Version", "https://astroship-pro.web3templates.com/") { Badge = true }
+    ];
+
+    private sealed class MenuItem(string title, string path)
+    {
+        public string Title { get; } = title;
+        public string Path { get; } = path;
+        public bool Badge { get; set; }
+        public List<MenuChild>? Children { get; set; }
+    }
+
+    private sealed class MenuChild(string title, string path)
+    {
+        public string Title { get; } = title;
+        public string Path { get; } = path;
+    }
+
+    private void SignIn()
+    {
+        Navigation.NavigateTo("/auth/login",forceLoad:true);
+    }
+}

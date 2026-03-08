@@ -1,0 +1,357 @@
+﻿@using Contract.InClass.Request.School
+@using Contract.InClass.Response.Files
+@using inclass.Client.Services
+@using Microsoft.AspNetCore.Http
+@* SchoolPictureSelector.razor *@
+@inject FileService FileService
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <label class="block text-sm font-medium text-gray-700">
+            School Pictures
+            <span class="text-gray-500 text-xs ml-2">(Select up to 3 pictures)</span>
+        </label>
+        @if (SelectedPictures.Count > 0)
+        {
+            <span class="text-sm text-gray-600">@SelectedPictures.Count / 3 selected</span>
+        }
+    </div>
+
+    <!-- Upload Area -->
+    <div class="flex items-center justify-center w-full">
+        <label for="dropzone-file" class="flex flex-col items-center justify-center w-full h-64 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-100 @(isUploading ? "opacity-50 cursor-not-allowed" : "")">
+            @if (isUploading)
+            {
+                <div class="flex flex-col items-center justify-center text-gray-500 pt-5 pb-6">
+                    <svg class="w-8 h-8 mb-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p class="text-sm font-semibold">Uploading...</p>
+                </div>
+            }
+            else
+            {
+                <div class="flex flex-col items-center justify-center text-gray-500 pt-5 pb-6">
+                    <svg class="w-8 h-8 mb-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h3a3 3 0 0 0 0-6h-.025a5.56 5.56 0 0 0 .025-.5A5.5 5.5 0 0 0 7.207 9.021C7.137 9.017 7.071 9 7 9a4 4 0 1 0 0 8h2.167M12 19v-9m0 0-2 2m2-2 2 2"/>
+                    </svg>
+                    <p class="mb-2 text-sm"><span class="font-semibold">Click to upload</span> or drag and drop</p>
+                    <p class="text-xs">PNG, JPG or JPEG (MAX. 5MB)</p>
+                </div>
+            }
+            <InputFile id="dropzone-file" OnChange="HandleFileUpload" class="hidden" accept="image/png,image/jpeg,image/jpg" disabled="@isUploading" />
+        </label>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="p-3 bg-red-50 border border-red-200 rounded-md">
+            <p class="text-sm text-red-600">@errorMessage</p>
+        </div>
+    }
+
+    <!-- Picture Grid -->
+    @if (isLoadingPictures)
+    {
+        <div class="flex justify-center items-center py-8">
+            <svg class="w-8 h-8 animate-spin text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+        </div>
+    }
+    else if (availablePictures.Count > 0)
+    {
+        <div>
+            <p class="text-sm font-medium text-gray-700 mb-3">Select pictures for your school:</p>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                @foreach (var picture in availablePictures)
+                {
+                    var isSelected = SelectedPictures.Any(p => p.PictureId == picture.Id);
+                    var isMainPicture = SelectedPictures.FirstOrDefault(p => p.PictureId == picture.Id)?.IsMain ?? false;
+                    
+                    <div class="relative group">
+                        <div class="@(isSelected ? "ring-2 ring-indigo-500" : "ring-1 ring-gray-200") rounded-lg overflow-hidden cursor-pointer transition-all hover:ring-2 hover:ring-indigo-300"
+                             @onclick="() => TogglePictureSelection(picture)">
+                            <img src="@picture.Url" alt="@picture.FileName" class="w-full h-32 object-cover" />
+                            
+                            <!-- Selection Overlay -->
+                            @if (isSelected)
+                            {
+                                <div class="absolute top-2 right-2 bg-indigo-600 text-white rounded-full p-1">
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                    </svg>
+                                </div>
+                            }
+                            
+                            <!-- Main Picture Badge -->
+                            @if (isMainPicture)
+                            {
+                                <div class="absolute top-2 left-2 bg-yellow-500 text-white text-xs font-semibold px-2 py-1 rounded">
+                                    Main
+                                </div>
+                            }
+                        </div>
+                        
+                        <!-- Picture Info & Actions -->
+                        @if (isSelected)
+                        {
+                            <div class="mt-2 flex justify-between items-center">
+                                <p class="text-xs text-gray-600 truncate flex-1">@picture.FileName</p>
+                                @if (!isMainPicture && SelectedPictures.Count > 0)
+                                {
+                                    <button 
+                                        type="button"
+                                        @onclick="() => SetAsMainPicture(picture)"
+                                        class="text-xs text-indigo-600 hover:text-indigo-800 font-medium ml-2">
+                                        Set as main
+                                    </button>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="text-center py-8 text-gray-500">
+            <p class="text-sm">No pictures available. Upload your first picture above.</p>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public List<CreateSchoolPicturesDto> SelectedPictures { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<List<CreateSchoolPicturesDto>> SelectedPicturesChanged { get; set; }
+
+    private List<UploadFileResult> availablePictures = new();
+    private bool isLoadingPictures = false;
+    private bool isUploading = false;
+    private string? errorMessage;
+    private const int MaxPictures = 3;
+    private const long MaxFileSize = 5 * 1024 * 1024; // 5MB
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPictures();
+    }
+
+    private async Task LoadPictures()
+    {
+        isLoadingPictures = true;
+        errorMessage = null;
+        
+        try
+        {
+            var response = await FileService.GetAllSchoolsUploadedPictures();
+            
+            if (response.IsSuccess && response.Data != null)
+            {
+                availablePictures = response.Data;
+            }
+            else
+            {
+                errorMessage = "Failed to load pictures";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading pictures: {ex.Message}";
+        }
+        finally
+        {
+            isLoadingPictures = false;
+        }
+    }
+
+    private async Task HandleFileUpload(InputFileChangeEventArgs e)
+    {
+        errorMessage = null;
+        isUploading = true;
+
+        try
+        {
+            var file = e.File;
+            
+            Console.WriteLine($"[DEBUG] File selected: {file?.Name ?? "NULL"}");
+            Console.WriteLine($"[DEBUG] File size: {file?.Size ?? 0}");
+            Console.WriteLine($"[DEBUG] File type: {file?.ContentType ?? "NULL"}");
+
+            if (file == null)
+            {
+                errorMessage = "No file selected";
+                isUploading = false;
+                return;
+            }
+
+            // Validate file size
+            if (file.Size > MaxFileSize)
+            {
+                errorMessage = "File size must be less than 5MB";
+                isUploading = false;
+                return;
+            }
+
+            // Validate file type
+            if (string.IsNullOrEmpty(file.ContentType) || !file.ContentType.StartsWith("image/"))
+            {
+                errorMessage = "Only image files are allowed";
+                isUploading = false;
+                return;
+            }
+
+            Console.WriteLine("[DEBUG] Creating BrowserFile wrapper...");
+            
+            // Create IFormFile wrapper
+            var formFile = new BrowserFile(file);
+            
+            Console.WriteLine("[DEBUG] Calling FileService.UploadFile...");
+            
+            var response = await FileService.UploadFile(formFile, CancellationToken.None);
+
+            Console.WriteLine($"[DEBUG] Response received");
+            Console.WriteLine($"[DEBUG] Response is null: {response == null}");
+            
+            if (response != null)
+            {
+                Console.WriteLine($"[DEBUG] Response.IsSuccess: {response.IsSuccess}");
+                Console.WriteLine($"[DEBUG] Response.Data is null: {response.Data == null}");
+                
+                if (response.Errors != null && response.Errors.Any())
+                {
+                    Console.WriteLine($"[DEBUG] Error count: {response.Errors.Length}");
+                    foreach (var error in response.Errors)
+                    {
+                        Console.WriteLine($"[DEBUG] Error - Code: {error.Code}, Message: {error.Message}, Type: {error.Type}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("[DEBUG] No errors in response");
+                }
+            }
+
+            if (response != null && response.IsSuccess)
+            {
+                Console.WriteLine("[DEBUG] Upload successful, reloading pictures...");
+                // Reload pictures after successful upload
+                await LoadPictures();
+            }
+            else
+            {
+                var errors = response?.Errors != null && response.Errors.Any() 
+                    ? string.Join(", ", response.Errors.Select(e => $"{e.Code}: {e.Message}")) 
+                    : "Unknown error - no error details provided";
+                    
+                errorMessage = $"Failed to upload file: {errors}";
+                Console.WriteLine($"[DEBUG] Upload failed: {errorMessage}");
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Upload error: {ex.GetType().Name} - {ex.Message}";
+            Console.WriteLine($"[DEBUG] Exception: {ex.GetType().Name}");
+            Console.WriteLine($"[DEBUG] Message: {ex.Message}");
+            Console.WriteLine($"[DEBUG] StackTrace: {ex.StackTrace}");
+            
+            if (ex.InnerException != null)
+            {
+                Console.WriteLine($"[DEBUG] InnerException: {ex.InnerException.Message}");
+            }
+        }
+        finally
+        {
+            isUploading = false;
+        }
+    }
+
+    private async Task TogglePictureSelection(UploadFileResult picture)
+    {
+        var existingSelection = SelectedPictures.FirstOrDefault(p => p.PictureId == picture.Id);
+
+        if (existingSelection != null)
+        {
+            // Deselect
+            SelectedPictures.Remove(existingSelection);
+            
+            // If this was the main picture, make the first picture main
+            if (existingSelection.IsMain && SelectedPictures.Count > 0)
+            {
+                SelectedPictures[0].IsMain = true;
+            }
+        }
+        else
+        {
+            // Check max selection limit
+            if (SelectedPictures.Count >= MaxPictures)
+            {
+                errorMessage = $"You can select a maximum of {MaxPictures} pictures";
+                return;
+            }
+
+            // Select - first picture is automatically main
+            SelectedPictures.Add(new CreateSchoolPicturesDto
+            {
+                PictureId = picture.Id,
+                IsMain = SelectedPictures.Count == 0
+            });
+            
+            errorMessage = null;
+        }
+
+        await SelectedPicturesChanged.InvokeAsync(SelectedPictures);
+    }
+
+    private async Task SetAsMainPicture(UploadFileResult picture)
+    {
+        // Set all to false
+        foreach (var pic in SelectedPictures)
+        {
+            pic.IsMain = false;
+        }
+
+        // Set selected as main
+        var selectedPic = SelectedPictures.FirstOrDefault(p => p.PictureId == picture.Id);
+        if (selectedPic != null)
+        {
+            selectedPic.IsMain = true;
+        }
+
+        await SelectedPicturesChanged.InvokeAsync(SelectedPictures);
+    }
+
+    // Helper class to wrap IBrowserFile as IFormFile
+    private class BrowserFile : IFormFile
+    {
+        private readonly IBrowserFile _file;
+
+        public BrowserFile(IBrowserFile file)
+        {
+            _file = file;
+        }
+
+        public string ContentType => _file.ContentType;
+        public string ContentDisposition => $"form-data; name=\"file\"; filename=\"{_file.Name}\"";
+        public IHeaderDictionary Headers => new HeaderDictionary();
+        public long Length => _file.Size;
+        public string Name => "file";
+        public string FileName => _file.Name;
+
+        public Stream OpenReadStream() => _file.OpenReadStream(MaxFileSize);
+
+        public void CopyTo(Stream target) => OpenReadStream().CopyTo(target);
+
+        public async Task CopyToAsync(Stream target, CancellationToken cancellationToken = default)
+        {
+            await using var stream = OpenReadStream();
+            await stream.CopyToAsync(target, cancellationToken);
+        }
+    }
+}

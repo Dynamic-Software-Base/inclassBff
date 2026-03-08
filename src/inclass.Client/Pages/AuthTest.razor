@@ -1,0 +1,63 @@
+﻿@page "/AuthTest"
+@layout DashboardLayout
+@using Contract.InClass.Request.Auth
+@using inclass.Client.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+
+@inject AuthService AuthService
+
+<h3>Auth Test</h3>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else if (_user is null)
+{
+    <p>Could not load user.</p>
+}
+else
+{
+    <ul>
+        <li><strong>Id:</strong> @_user.value</li>
+        <li><strong>Email:</strong> @_user.email</li>
+        <li><strong>Full Name:</strong> @_user.fullName</li>
+        <li><strong>Roles:</strong> @string.Join(", ", _user.roles)</li>
+        <li><strong>Is School Owner:</strong> @_user.isSchoolOwner</li>
+        <li><strong>Is Teacher:</strong> @_user.isTeacher</li>
+        <li><strong>Is Student:</strong> @_user.isStudent</li>
+        <li><strong>Is Student:</strong> @_user.isPlatformAdmin</li>
+        <li><strong>Is Student:</strong> @_user.isSchoolOwner</li>
+    </ul>
+
+    <hr />
+}
+
+@if (errors.Any())
+{
+    foreach (var error in errors)
+    {
+        <span class="bg-danger-soft border border-danger-subtle text-fg-danger-strong text-xs font-medium px-1.5 py-0.5 rounded">@error</span>
+    }
+}
+@code {
+    private CurrentUser? _user;
+    private bool _loading = true;
+    private List<Error> errors = [];
+    protected override async Task OnInitializedAsync()
+    {
+        errors = [];
+        ErrorOr<CurrentUser?> result = await AuthService.GetCurrentUserAsync();
+        if (result.IsError)
+        {
+            errors.AddRange(result.Errors);
+            return;
+        }
+
+        _user = result.Value;
+        _loading = false;
+    }
+
+   
+}
