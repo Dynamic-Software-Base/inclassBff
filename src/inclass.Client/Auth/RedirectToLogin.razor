@@ -1,0 +1,15 @@
+@namespace InClass.Client.Auth
+@inject NavigationManager NavigationManager
+
+@code {
+    private bool _redirected;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (_redirected) return;
+        _redirected = true;
+
+        // full page load so the BFF endpoint is actually hit
+        NavigationManager.NavigateTo("/auth/login", forceLoad: true);
+    }
+}

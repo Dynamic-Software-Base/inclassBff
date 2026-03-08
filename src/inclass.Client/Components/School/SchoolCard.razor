@@ -1,0 +1,51 @@
+﻿@using Contract.InClass.Response.School
+<div class="flex h-[420px] w-full max-w-sm flex-col rounded-2xl bg-white p-3 shadow-sm">
+    <div class="basis-[60%] overflow-hidden rounded-3xl bg-neutral-100">
+        @if (!string.IsNullOrWhiteSpace(MainPicture?.Url))
+        {
+            <img src="@MainPicture.Url" alt="@School.Name" class="h-full w-full object-cover" />
+        }
+        else
+        {
+            <img
+                src="https://images.unsplash.com/photo-1506744038136-46273834b3fb"
+                alt=""
+                class="h-full w-full object-cover" />
+        }
+    </div>
+
+    <div class="basis-[40%] px-3 pb-3 pt-4">
+        <h3 class="text-2xl font-semibold tracking-tight text-neutral-900">
+            @School.Name
+        </h3>
+
+        @if (!string.IsNullOrWhiteSpace(School.ArName))
+        {
+            <p class="mt-1 text-sm text-neutral-500">
+                @School.ArName
+            </p>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(School.City))
+        {
+            <p class="mt-3 text-sm font-medium text-neutral-700">
+                @School.City
+            </p>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(School.Description))
+        {
+            <p class="mt-2 text-sm leading-6 text-neutral-500">
+                @School.Description
+            </p>
+        }
+    </div>
+</div>
+@code {
+    [Parameter, EditorRequired]
+    public SchoolSummaryDto School { get; set; } = default!;
+
+    private SchoolPictureResponse? MainPicture =>
+        School.Pictures?.FirstOrDefault(p => p.IsMain)
+        ?? School.Pictures?.FirstOrDefault();
+}

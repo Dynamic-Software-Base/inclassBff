@@ -1,0 +1,73 @@
+﻿@page "/MySchools"
+@using inclass.Client.Components.School
+@using inclass.Client.Services
+
+@layout DashboardLayout
+@if (_loading)
+{
+    <p>Loading ... </p>
+}
+else if(_error is not null)
+{
+    <p class="text-red-500">@_error</p>
+}else if (_schools.Count == 0)
+{
+    <div class="h-full min-h-full rounded-md bg-white p-6">
+        <div class="flex min-h-[calc(100vh-220px)] items-center justify-center">
+            <div class="flex flex-col items-center text-center">
+                <div class="flex h-20 w-20 items-center justify-center rounded-full bg-neutral-100">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         width="32"
+                         height="32"
+                         viewBox="0 0 24 24"
+                         fill="none"
+                         stroke="#6b6b6b"
+                         stroke-width="2"
+                         stroke-linecap="round"
+                         stroke-linejoin="round"
+                         class="lucide lucide-grid2x2-x-icon lucide-grid-2x2-x">
+                        <path d="M12 3v17a1 1 0 0 1-1 1H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1H3" />
+                        <path d="m16 16 5 5" />
+                        <path d="m16 21 5-5" />
+                    </svg>
+                </div>
+
+                <h3 class="mt-4 text-lg font-semibold text-neutral-900">No schools found</h3>
+                <p class="mt-2 max-w-sm text-sm text-neutral-500">
+                    You don’t have any schools yet. Create your first school to get started.
+                </p>
+
+                <button  class="cursor-pointer mt-5 rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700">
+                    <NavLink href="/Create" >Create school</NavLink>
+                </button>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div>
+        <div class="mb-6 flex items-center justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-semibold tracking-tight text-neutral-900">My Schools</h1>
+                <p class="mt-1 text-sm text-neutral-500">Manage your schools and add new ones.</p>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <button @onclick="NavigateToCreate" type="button" class="cursor-pointer rounded-full bg-black p-2 text-white shadow-xs hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+                    <svg class="size-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" data-slot="icon">
+                        <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 justify-items-center gap-6 sm:grid-cols-2 xl:grid-cols-3">
+            @foreach (var school in _schools)
+            {
+                <SchoolCard School="school"></SchoolCard>
+            }
+        </div>
+    </div>
+   
+}

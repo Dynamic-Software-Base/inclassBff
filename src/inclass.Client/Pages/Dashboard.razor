@@ -1,0 +1,52 @@
+@page "/dashboard"
+@layout DashboardLayout
+@attribute [Authorize]
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject HttpClient HttpClient
+@inject NavigationManager NavigationManager
+
+<PageTitle>Dashboard</PageTitle>
+
+<h1>Dashboard</h1>
+
+<AuthorizeView>
+    <Authorized Context="authState">
+        <p><strong>Full Name:</strong> @GetFullName(authState.User)</p>
+        <p><strong>Email:</strong> @GetEmail(authState.User)</p>
+        <p><strong>Roles:</strong> @GetRoles(authState.User)</p>
+
+        <button class="btn btn-secondary" @onclick="SignOutAsync">Sign Out</button>
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    private static string GetFullName(ClaimsPrincipal user)
+    {
+        return user.FindFirst(ClaimTypes.Name)?.Value ?? "N/A";
+    }
+
+    private static string GetEmail(ClaimsPrincipal user)
+    {
+        return user.FindFirst(ClaimTypes.Email)?.Value ?? "N/A";
+    }
+
+    private static string GetRoles(ClaimsPrincipal user)
+    {
+        var roles = user.FindAll(ClaimTypes.Role).Select(claim => claim.Value);
+        return string.Join(", ", roles.DefaultIfEmpty("None"));
+    }
+
+    private async Task SignOutAsync()
+    {
+        try
+        {
+            await HttpClient.PostAsync("/auth/logout", content: null);
+        }
+        finally
+        {
+            NavigationManager.NavigateTo("/login", forceLoad: true);
+        }
+    }
+}

@@ -1,0 +1,13 @@
+﻿<div class="@CssClass">
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private string CssClass =>
+        string.IsNullOrWhiteSpace(Class)
+            ? "max-w-screen-xl mx-auto px-5"
+            : $"max-w-screen-xl mx-auto px-5 {Class}";
+}

@@ -17,19 +17,6 @@ var allowedCorsOrigins = ParseOrigins(builder.Configuration["AllowedCorsOrigins"
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<InMemoryTicketStore>();
 
-// ── CORS ───────────────────────────────────────────────────────────────────────
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("Angular", policy =>
-    {
-        policy
-            .WithOrigins(allowedCorsOrigins)
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials();
-    });
-});
-
 // ── Authentication ─────────────────────────────────────────────────────────────
 builder.Services.AddAuthentication(options =>
 {
@@ -40,7 +27,9 @@ builder.Services.AddAuthentication(options =>
 {
     options.Cookie.Name = "inclass.session";
     options.Cookie.HttpOnly = true;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+        ? CookieSecurePolicy.SameAsRequest
+        : CookieSecurePolicy.Always;
     options.Cookie.SameSite = SameSiteMode.Lax; 
     options.Cookie.Path = "/";
     options.ExpireTimeSpan = TimeSpan.FromHours(8);
@@ -119,7 +108,10 @@ builder.Services
     });
 
 // ── Authorization ──────────────────────────────────────────────────────────────
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("ApiAuth", policy => policy.RequireAuthenticatedUser());
+});
 
 // ── YARP Reverse Proxy ─────────────────────────────────────────────────────────
 builder.Services.AddReverseProxy()
@@ -138,28 +130,30 @@ builder.Services.AddReverseProxy()
             }
         });
     });
-
 builder.Services.AddControllers();
 
 var app = builder.Build();
-app.UseDefaultFiles();        // serves index.html for /
-app.UseStaticFiles();         // serves JS/CSS/assets from wwwroot
+
+app.UseHttpsRedirection();
+app.UseBlazorFrameworkFiles();   // serves _framework/, _content/ etc.
+app.UseStaticFiles();            // serves everything else in wwwroot
+
+app.UseRouting();  
 // ── Middleware pipeline ────────────────────────────────────────────────────────
-// Order matters: CORS must come before Auth
-app.UseCors("Angular");
+
 app.UseAuthentication();
 app.UseAuthorization();
-
+app.UseWebSockets();
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
 app.MapGet("/debug/config", (IConfiguration config) => new
 {
     AllowedCorsOrigins = config["AllowedCorsOrigins"],
     Environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
 }).AllowAnonymous();
-
-app.MapReverseProxy().RequireAuthorization();
 app.MapControllers();
-app.MapFallbackToFile("index.html"); // MUST be last — handles Angular routing
+app.MapReverseProxy();
+
+app.MapFallbackToFile("index.html");
 app.Run();
 
 // ── Helpers ────────────────────────────────────────────────────────────────────

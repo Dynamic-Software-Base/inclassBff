@@ -1,0 +1,360 @@
+﻿@page "/Create"
+@inject FileService  FileService   
+@using inclass.Client.Components.Reuse
+@using inclass.Client.Services
+@using static inclass.Client.Helpers.StaticData.SchoolCreationStaticData
+@layout DashboardLayout
+
+<div class="h-full flex flex-col lg:flex-row gap-4">
+    
+    <!-- Form Container (2/3 width on desktop) -->
+    <div class="flex-1 lg:w-2/3 bg-white rounded-lg shadow-sm overflow-y-auto">
+        <div class="p-6">
+            <!-- Header -->
+            <div class="mb-6 flex items-center justify-between">
+                <h1 class="text-2xl font-bold text-gray-900">Create a school</h1>
+                
+                <!-- Mobile Widget Toggle Button -->
+                <button 
+                    type="button"
+                    @onclick="ToggleWidget"
+                    class="lg:hidden inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Form Content -->
+            <EditForm Model="@school" FormName="School Creation" OnValidSubmit="CreateSchool">
+                <DataAnnotationsValidator/>
+                
+                <div class="space-y-8">
+                    
+                    <!-- General Information Section -->
+                    <div class="border-b border-gray-200 pb-8">
+                        <h2 class="text-lg font-semibold text-gray-900 mb-4">General Information</h2>
+                        
+                        <div class="space-y-4">
+                            <!-- School Name -->
+                            <div>
+                                <label for="name" class="block text-sm font-medium text-gray-700 mb-1">
+                                    School Name <span class="text-red-500">*</span>
+                                </label>
+                                <InputText 
+                                    id="name" 
+                                    @bind-Value="school.Name" 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
+                                    placeholder="Enter school name" />
+                                <ValidationMessage For="@(() => school.Name)" class="text-red-600 text-sm mt-1" />
+                            </div>
+
+                            <!-- Arabic Name -->
+                            <div>
+                                <label for="arName" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Arabic Name
+                                </label>
+                                <InputText 
+                                    id="arName" 
+                                    @bind-Value="school.Ar_Name" 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
+                                    placeholder="أدخل اسم المدرسة بالعربية" />
+                            </div>
+
+                            <!-- Description -->
+                            <div>
+                                <label for="description" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Description
+                                </label>
+                                <InputTextArea 
+                                    id="description" 
+                                    @bind-Value="school.Description" 
+                                    rows="4"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
+                                    placeholder="Enter school description" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Address Section -->
+                    <div class="border-b border-gray-200 pb-8">
+                        <h2 class="text-lg font-semibold text-gray-900 mb-4">Address</h2>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- Region -->
+                            <div class="md:col-span-2">
+                                <label for="region" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Region <span class="text-red-500">*</span>
+                                </label>
+                                <InputSelect 
+                                    id="region" 
+                                    @bind-Value="school.Address.Region" 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                    <option value="">Select a region</option>
+                                    @foreach (var region in Regions)
+                                    {
+                                        <option value="@region">@region</option>
+                                    }
+                                </InputSelect>
+                            </div>
+
+                            <!-- Province -->
+                            <div>
+                                <label for="province" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Province <span class="text-red-500">*</span>
+                                </label>
+                                <InputSelect 
+                                    id="province" 
+                                    @bind-Value="school.Address.Province" 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                    <option value="">Select a province</option>
+                                    @foreach (var province in Provinces)
+                                    {
+                                        <option value="@province">@province</option>
+                                    }
+                                </InputSelect>
+                            </div>
+
+                            <!-- City -->
+                            <div>
+                                <label for="city" class="block text-sm font-medium text-gray-700 mb-1">
+                                    City <span class="text-red-500">*</span>
+                                </label>
+                                <InputSelect 
+                                    id="city" 
+                                    @bind-Value="school.Address.City" 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                    <option value="">Select a city</option>
+                                    @foreach (var city in Cities)
+                                    {
+                                        <option value="@city">@city</option>
+                                    }
+                                </InputSelect>
+                            </div>
+
+                            <!-- Street Address -->
+                            <div class="md:col-span-2">
+                                <label for="streetAddress" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Street Address
+                                </label>
+                                <InputText 
+                                    id="streetAddress" 
+                                    @bind-Value="school.Address.StreetAddress" 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
+                                    placeholder="Enter street address" />
+                            </div>
+
+                            <!-- Building Number -->
+                            <div>
+                                <label for="buildingNumber" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Building Number
+                                </label>
+                                <InputText 
+                                    id="buildingNumber" 
+                                    @bind-Value="school.Address.BuildingNumber" 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
+                                    placeholder="Building #" />
+                            </div>
+
+                            <!-- Apartment Number -->
+                            <div>
+                                <label for="apartmentNumber" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Apartment Number
+                                </label>
+                                <InputText 
+                                    id="apartmentNumber" 
+                                    @bind-Value="school.Address.ApartmentNumber" 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
+                                    placeholder="Apt #" />
+                            </div>
+
+                            <!-- Postal Code -->
+                            <div>
+                                <label for="postalCode" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Postal Code
+                                </label>
+                                <InputText 
+                                    id="postalCode" 
+                                    @bind-Value="school.Address.PostalCode" 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
+                                    placeholder="Enter postal code" />
+                            </div>
+                        </div>
+                    </div>
+<!-- Contact Information Section -->
+<!-- Insert this section between Address Section and Grade Levels Section -->
+
+                    <!-- Contact Information Section -->
+                    <div class="border-b border-gray-200 pb-8">
+                        <h2 class="text-lg font-semibold text-gray-900 mb-4">Contact Information</h2>
+                        
+                        <div class="space-y-4">
+                            <!-- Email -->
+                            <div>
+                                <label for="email" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Email <span class="text-red-500">*</span>
+                                </label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
+                                        <svg class="w-4 h-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+                                            <path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="m3.5 5.5 7.893 6.036a1 1 0 0 0 1.214 0L20.5 5.5M4 19h16a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1Z"/>
+                                        </svg>
+                                    </div>
+                                    <InputText 
+                                        id="email" 
+                                        type="email"
+                                        @bind-Value="school.ContactInfo.Email" 
+                                        class="block w-full ps-9 pe-3 py-2 border border-gray-300 text-gray-900 text-sm rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm placeholder:text-gray-400" 
+                                        placeholder="school@example.com" />
+                                </div>
+                                <ValidationMessage For="@(() => school.ContactInfo.Email)" class="text-red-600 text-sm mt-1" />
+                            </div>
+
+                            <!-- Primary Phone Number -->
+                            <PhoneNumberInput 
+                                Id="primaryPhone"
+                                Label="Primary Phone Number"
+                                @bind-Value="school.ContactInfo.PrimaryPhoneNumber"
+                                Required="true"
+                                Placeholder="0612345678" />
+
+                            <!-- Secondary Phone Number -->
+                            <PhoneNumberInput 
+                                Id="secondaryPhone"
+                                Label="Secondary Phone Number (Optional)"
+                                @bind-Value="school.ContactInfo.SecondaryPhoneNumber"
+                                Required="false"
+                                Placeholder="0512345678" />
+                        </div>
+                    </div>
+                    <!-- Grade Levels Section -->
+                    <div class="border-b border-gray-200 pb-8">
+                        <h2 class="text-lg font-semibold text-gray-900 mb-4">Grade Levels Offered</h2>
+                        
+                        <div class="space-y-3">
+                            <!-- Pre-School -->
+                            <div class="flex items-center">
+                                <InputCheckbox 
+                                    id="hasPreSchool" 
+                                    @bind-Value="school.GradeLevels.HasPreSchool" 
+                                    class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
+                                <label for="hasPreSchool" class="ml-3 block text-sm font-medium text-gray-700">
+                                    Pre-School
+                                </label>
+                            </div>
+
+                            <!-- Primary School -->
+                            <div class="flex items-center">
+                                <InputCheckbox 
+                                    id="hasPrimarySchool" 
+                                    @bind-Value="school.GradeLevels.HasPrimarySchool" 
+                                    class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
+                                <label for="hasPrimarySchool" class="ml-3 block text-sm font-medium text-gray-700">
+                                    Primary School
+                                </label>
+                            </div>
+
+                            <!-- Middle School -->
+                            <div class="flex items-center">
+                                <InputCheckbox 
+                                    id="hasMiddleSchool" 
+                                    @bind-Value="school.GradeLevels.HasMiddleSchool" 
+                                    class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
+                                <label for="hasMiddleSchool" class="ml-3 block text-sm font-medium text-gray-700">
+                                    Middle School
+                                </label>
+                            </div>
+
+                            <!-- High School -->
+                            <div class="flex items-center">
+                                <InputCheckbox 
+                                    id="hasHighSchool" 
+                                    @bind-Value="school.GradeLevels.HasHighSchool" 
+                                    class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
+                                <label for="hasHighSchool" class="ml-3 block text-sm font-medium text-gray-700">
+                                    High School
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- School Pictures Section -->
+                    <!-- Insert this section after the Grade Levels Section, before Form Actions -->
+
+                    <!-- School Pictures Section -->
+                    <div class="border-b border-gray-200 pb-8">
+                        <h2 class="text-lg font-semibold text-gray-900 mb-4">School Pictures</h2>
+                        
+                        <SchoolPictureSelector @bind-SelectedPictures="school.Pictures" />
+                    </div>
+                    <!-- Form Actions -->
+                    <div class="flex justify-end gap-3 pt-4">
+                        <button 
+                            type="button" 
+                            class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                            Cancel
+                        </button>
+                        <button 
+                            type="submit" 
+                            class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+                            Create School
+                        </button>
+                    </div>
+
+                </div>
+                
+            </EditForm>
+        </div>
+    </div>
+
+    <!-- Widget Container (1/3 width on desktop, overlay on mobile) -->
+    <div class="@GetWidgetClasses()">
+        <!-- Mobile Close Button -->
+        <div class="lg:hidden p-4 border-b border-gray-200 flex justify-between items-center">
+            <h2 class="text-lg font-semibold text-gray-900">Widget</h2>
+            <button 
+                type="button"
+                @onclick="ToggleWidget"
+                class="text-gray-400 hover:text-gray-500">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Widget Content -->
+        <div class="p-6">
+            <!-- Widget content will go here -->
+            <p class="text-sm text-gray-500">Widget content area</p>
+        </div>
+    </div>
+
+    <!-- Mobile Overlay Background -->
+    @if (isWidgetOpen)
+    {
+        <div 
+            class="lg:hidden fixed inset-0 bg-gray-600 bg-opacity-50 z-40"
+            @onclick="ToggleWidget">
+        </div>
+    }
+</div>
+
+@code {
+    private bool isWidgetOpen = false;
+
+    private void ToggleWidget()
+    {
+        isWidgetOpen = !isWidgetOpen;
+    }
+
+    private string GetWidgetClasses()
+    {
+        var baseClasses = "bg-white rounded-lg shadow-sm overflow-y-auto";
+        var desktopClasses = "lg:block lg:w-1/3 lg:relative lg:z-0";
+        var mobileClasses = isWidgetOpen 
+            ? "fixed top-0 right-0 bottom-0 w-80 z-50 transform translate-x-0" 
+            : "hidden";
+        
+        return $"{baseClasses} {desktopClasses} {mobileClasses}";
+    }
+    
+}
