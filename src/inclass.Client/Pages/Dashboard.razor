@@ -40,13 +40,6 @@
 
     private async Task SignOutAsync()
     {
-        try
-        {
-            await HttpClient.PostAsync("/auth/logout", content: null);
-        }
-        finally
-        {
-            NavigationManager.NavigateTo("/login", forceLoad: true);
-        }
+        NavigationManager.NavigateTo("/auth/logout", forceLoad: true);
     }
 }

@@ -8,7 +8,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Contract.InClass" Version="1.0.7" />
+        <PackageReference Include="Contract.InClass" Version="1.0.10" />
         <PackageReference Include="ErrorOr" Version="2.0.1" />
         <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="10.0.0" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.0" />

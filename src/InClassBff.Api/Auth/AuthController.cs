@@ -42,7 +42,7 @@ public class AuthController : ControllerBase
         return Redirect(_allowedOrigins[0]);
     }
 
-    [HttpPost("logout")]
+    [HttpGet("logout")]   // Changed from HttpPost → HttpGet
     [Authorize]
     public IActionResult Logout()
     {
