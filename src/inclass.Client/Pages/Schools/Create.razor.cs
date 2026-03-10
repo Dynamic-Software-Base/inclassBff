@@ -20,23 +20,23 @@ public partial class Create : ComponentBase
             NavigationManager.NavigateTo("/schools");
             return;
         }
-        
-        errorMessage = result.Errors.Select(e =>  e.Message).ToList();
+
+        errorMessage = result.Errors?.Select(e => e.Message).ToList() 
+                       ?? ["An unexpected error occurred."];
     }
 
-    protected override async  Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync()
     {
         var result = await FileService.GetAllSchoolsUploadedPictures();
-        Console.WriteLine(result.Data);
-    
+
         if (result.IsSuccess)
         {
             uploadedPictures = result.Data!;
             return;
         }
 
-        errorMessage = result.Errors.Select(e =>  e.Message).ToList();
-
+        errorMessage = result.Errors?.Select(e => e.Message).ToList() 
+                       ?? ["An unexpected error occurred."];
     }
 
 }
