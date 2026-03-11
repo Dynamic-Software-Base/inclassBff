@@ -1,0 +1,137 @@
+﻿@* Components/Schools/SchoolDetailWidget.razor *@
+@using Contract.InClass.Response.School
+
+@if (School is null)
+{
+    <div class="flex flex-col items-center justify-center h-64 text-center px-6">
+        <div class="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+            <svg class="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                      d="M12 14l9-5-9-5-9 5 9 5zm0 0v6"/>
+            </svg>
+        </div>
+        <p class="text-sm text-gray-400">Select a school to see details</p>
+    </div>
+}
+else
+{
+    <div class="flex flex-col gap-0 animate-fade-in">
+        
+        <div class="relative w-full h-44 rounded-2xl overflow-hidden bg-gradient-to-br from-indigo-100 to-indigo-200 shrink-0">
+            @if (School.Pictures is { Count: > 0 })
+            {
+                <img src="@School.Pictures[_activeImageIndex].Url"
+                     alt="@School.Name"
+                     class="w-full h-full object-cover" />
+
+                @if (School.Pictures.Count > 1)
+                {
+                    <div class="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
+                        @for (int i = 0; i < School.Pictures.Count; i++)
+                        {
+                            var idx = i;
+                            <button class="w-1.5 h-1.5 rounded-full transition-all
+                                           @(_activeImageIndex == idx ? "bg-white w-3" : "bg-white/50")"
+                                    @onclick="() => _activeImageIndex = idx">
+                            </button>
+                        }
+                    </div>
+                    
+                    @if (_activeImageIndex > 0)
+                    {
+                        <button class="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-black/30 hover:bg-black/50 rounded-full flex items-center justify-center backdrop-blur-sm transition-colors"
+                                @onclick="PrevImage">
+                            <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/>
+                            </svg>
+                        </button>
+                    }
+                    @if (_activeImageIndex < School.Pictures.Count - 1)
+                    {
+                        <button class="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-black/30 hover:bg-black/50 rounded-full flex items-center justify-center backdrop-blur-sm transition-colors"
+                                @onclick="NextImage">
+                            <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </button>
+                    }
+                }
+            }
+            else
+            {
+                <div class="w-full h-full flex items-center justify-center">
+                    <svg class="w-12 h-12 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
+                              d="M12 14l9-5-9-5-9 5 9 5zm0 0v6m0-6l-3.5 2M12 14l3.5 2"/>
+                    </svg>
+                </div>
+            }
+        </div>
+        
+        <div class="pt-4 flex flex-col gap-4">
+            
+            <div>
+                <h2 class="text-lg font-bold text-gray-900 leading-tight">@School.Name</h2>
+                @if (!string.IsNullOrEmpty(School.ArName))
+                {
+                    <p class="text-sm text-gray-400 mt-0.5" dir="rtl">@School.ArName</p>
+                }
+                @if (!string.IsNullOrEmpty(School.City))
+                {
+                    <div class="flex items-center gap-1.5 mt-2">
+                        <svg class="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+                        </svg>
+                        <span class="text-sm text-gray-500">@School.City</span>
+                    </div>
+                }
+            </div>
+            
+            <div>
+                <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Grade Levels</p>
+                <div class="flex flex-wrap gap-1.5">
+                    @if (School.GradeLevelOffering.HasPreSchool)    { <GradeLevelTag Label="Pre-School"    Icon="🌱" /> }
+                    @if (School.GradeLevelOffering.HasPrimarySchool) { <GradeLevelTag Label="Primary"       Icon="📚" /> }
+                    @if (School.GradeLevelOffering.HasMiddleSchool)  { <GradeLevelTag Label="Middle School" Icon="🔬" /> }
+                    @if (School.GradeLevelOffering.HasHighSchool)    { <GradeLevelTag Label="High School"   Icon="🎓" /> }
+                </div>
+            </div>
+            @if (!string.IsNullOrEmpty(School.Description))
+            {
+                <div>
+                    <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">About</p>
+                    <p class="text-sm text-gray-600 leading-relaxed line-clamp-4">@School.Description</p>
+                </div>
+            }
+
+       
+            @* Replace the coordinates div with this *@
+            @if (School.Latitude.HasValue && School.Longitude.HasValue)
+            {
+                <div>
+                    <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Location</p>
+                    <SchoolMap Latitude="School.Latitude.Value"
+                               Longitude="School.Longitude.Value"
+                               Height="180px" />
+                </div>
+            }
+
+        
+            <button class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-sm font-semibold rounded-xl transition-all duration-150 shadow-sm">
+                View Full Profile
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public SchoolSummaryDto? School { get; set; }
+
+    private int _activeImageIndex;
+
+    protected override void OnParametersSet() => _activeImageIndex = 0;
+
+    private void PrevImage() { if (_activeImageIndex > 0) _activeImageIndex--; }
+    private void NextImage()  { if (_activeImageIndex < (School?.Pictures?.Count ?? 1) - 1) _activeImageIndex++; }
+}

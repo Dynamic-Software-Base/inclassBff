@@ -12,10 +12,12 @@
     <link rel="icon" type="image/png" href="favicon.png" />
     <link rel="stylesheet" href="css/output.css" />
     <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css'>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+
     <script type="importmap"></script>
 </head>
 
-<body class="h-full overflow-hidden bg-[#f2f2f3]">
+<body class="min-h-screen overflow-x-hidden bg-[#f2f2f3]">
     <div id="app">
         <svg class="loading-progress">
             <circle r="40%" cx="50%" cy="50%" />
@@ -30,8 +32,11 @@
         <span class="dismiss">🗙</span>
     </div>
     
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
     <script type="module" src="js/app.js"></script>
+    <script src="js/map.js"></script>
 </body>
 
 </html>

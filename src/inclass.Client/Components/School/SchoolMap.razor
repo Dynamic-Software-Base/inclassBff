@@ -1,0 +1,38 @@
+﻿@* Components/Schools/SchoolMap.razor *@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="rounded-xl overflow-hidden border border-gray-100" style="height: @Height;">
+    <div id="@_mapId" style="width:100%; height:100%;"></div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public double  Latitude  { get; set; }
+    [Parameter, EditorRequired] public double  Longitude { get; set; }
+[Parameter]                 public string  Height    { get; set; } = "200px";
+
+    private string _mapId = $"map-{Guid.NewGuid():N}";
+    private bool   _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("mapInterop.init", _mapId, Latitude, Longitude);
+            _initialized = true;
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // When selected school changes, update the pin
+        if (_initialized)
+            await JS.InvokeVoidAsync("mapInterop.update", _mapId, Latitude, Longitude);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_initialized)
+            await JS.InvokeVoidAsync("mapInterop.destroy", _mapId);
+    }
+}

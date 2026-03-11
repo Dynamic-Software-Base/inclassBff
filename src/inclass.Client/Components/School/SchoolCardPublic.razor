@@ -1,0 +1,81 @@
+﻿@using Contract.InClass.Response.School
+@using Contract.InClass.Common
+
+<div class="group flex items-start gap-4 p-4 rounded-xl cursor-pointer transition-all duration-150 border
+            @(IsSelected
+                ? "bg-indigo-50 border-indigo-200 shadow-sm"
+                : "bg-white border-transparent hover:bg-gray-50 hover:border-gray-200")"
+     @onclick="() => OnSelect.InvokeAsync(School)">
+
+    
+    <div class="w-16 h-16 rounded-xl shrink-0 overflow-hidden bg-gray-100">
+        @if (School.Pictures is { Count: > 0 })
+        {
+            <img src="@School.Pictures[0].Url"
+                 alt="@School.Name"
+                 class="w-full h-full object-cover" />
+        }
+        else
+        {
+            <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-100 to-indigo-200">
+                <svg class="w-7 h-7 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                          d="M12 14l9-5-9-5-9 5 9 5zm0 0v6m0-6l-3.5 2M12 14l3.5 2"/>
+                </svg>
+            </div>
+        }
+    </div>
+
+
+    <div class="flex-1 min-w-0">
+        <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+                <h3 class="font-semibold text-gray-900 text-sm truncate leading-snug">@School.Name</h3>
+                @if (!string.IsNullOrEmpty(School.ArName))
+                {
+                    <p class="text-xs text-gray-400 truncate font-arabic" dir="rtl">@School.ArName</p>
+                }
+            </div>
+            @if (IsSelected)
+            {
+                <span class="shrink-0 w-2 h-2 rounded-full bg-indigo-500 mt-1.5"></span>
+            }
+        </div>
+
+        @if (!string.IsNullOrEmpty(School.City))
+        {
+            <div class="flex items-center gap-1 mt-1.5">
+                <svg class="w-3 h-3 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+                </svg>
+                <span class="text-xs text-gray-400">@School.City</span>
+            </div>
+        }
+
+        <div class="flex flex-wrap gap-1 mt-2">
+            @if (School.GradeLevelOffering.HasPreSchool)
+            {
+                <GradeBadge Label="Pre" />
+            }
+            @if (School.GradeLevelOffering.HasPrimarySchool)
+            {
+                <GradeBadge Label="Primary" />
+            }
+            @if (School.GradeLevelOffering.HasMiddleSchool)
+            {
+                <GradeBadge Label="Middle" />
+            }
+            @if (School.GradeLevelOffering.HasHighSchool)
+            {
+                <GradeBadge Label="High" />
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SchoolSummaryDto School  { get; set; } = null!;
+    [Parameter]                 public bool             IsSelected { get; set; }
+    [Parameter]                 public EventCallback<SchoolSummaryDto> OnSelect { get; set; }
+}

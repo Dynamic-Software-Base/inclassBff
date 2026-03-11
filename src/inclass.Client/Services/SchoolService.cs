@@ -1,5 +1,6 @@
 ﻿using System.Net.Http.Json;
 using Contract.InClass.ApiContract;
+using Contract.InClass.Pagination;
 using Contract.InClass.Request.School;
 using Contract.InClass.Response.School;
 using inclass.Client.Services.Api;
@@ -15,9 +16,12 @@ public class SchoolService
         _client = client;
     }
 
-    
-    
 
+
+    public async Task<ApiResponse<PagedResult<SchoolSummaryDto>>> GetSchools(GetSchoolQuery query)
+    {
+        return await _client.GetAsync<PagedResult<SchoolSummaryDto>>("/public/api/schools/Listing", query);
+    }
     public async Task<ApiResponse<CreateSchoolResponse>> CreateSchool(CreateSchoolRequestDto request)
     {
        return await _client.PostAsync<CreateSchoolResponse>("/api/schools", request);

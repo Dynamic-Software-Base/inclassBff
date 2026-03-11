@@ -1,0 +1,241 @@
+﻿@* Components/Schools/SchoolSearchFilter.razor *@
+@using Contract.InClass.Request.School
+@using Contract.InClass.Common
+@using inclass.Client.Helpers
+
+<div class="w-full">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 px-2 py-2">
+        <div class="flex flex-row items-center w-full">
+            
+            <div class="flex-1 flex items-center gap-3 px-4 py-2 border-r border-gray-200 group min-w-0">
+                <svg class="w-4 h-4 text-gray-400 shrink-0 group-focus-within:text-indigo-500 transition-colors"
+                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
+                </svg>
+                <div class="flex flex-col w-full min-w-0">
+                    <label class="text-[10px] font-semibold uppercase tracking-widest text-gray-400">School</label>
+                    <input
+                        class="text-sm text-gray-800 placeholder-gray-300 bg-transparent outline-none w-full truncate"
+                        placeholder="Search by name..."
+                        value="@_query.NameSearch"
+                        @oninput="e => OnNameChanged(e.Value?.ToString())" />
+                </div>
+            </div>
+            
+            <div class="flex-1 flex items-center gap-3 px-4 py-2 border-r border-gray-200 relative min-w-0">
+                <svg class="w-4 h-4 text-gray-400 shrink-0 @(_cityOpen ? "text-indigo-500" : "") transition-colors"
+                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5z"/>
+                </svg>
+                <div class="flex flex-col w-full min-w-0 cursor-pointer" @onclick="ToggleCityDropdown">
+                    <label class="text-[10px] font-semibold uppercase tracking-widest text-gray-400 cursor-pointer">City</label>
+                    <span class="text-sm @(string.IsNullOrEmpty(_query.City) ? "text-gray-300" : "text-gray-800") select-none truncate">
+                        @(string.IsNullOrEmpty(_query.City) ? "Any city..." : _query.City)
+                    </span>
+                </div>
+                <svg class="w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200 @(_cityOpen ? "rotate-180" : "")"
+                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+
+                @if (_cityOpen)
+                {
+                    <div class="absolute top-full left-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1.5 z-50">
+                        <button
+                            class="w-full text-left px-4 py-2.5 text-sm transition-colors
+                                   @(string.IsNullOrEmpty(_query.City) ? "text-indigo-600 font-medium bg-indigo-50/50" : "text-gray-500 hover:bg-indigo-50 hover:text-indigo-700")"
+                            @onclick:stopPropagation="true"
+                            @onclick="() => SelectCity(null)">
+                            Any city
+                        </button>
+                        @foreach (var city in _cities)
+                        {
+                            var c = city;
+                            <button
+                                class="w-full text-left px-4 py-2.5 text-sm transition-colors
+                                       @(_query.City == c ? "text-indigo-600 font-medium bg-indigo-50/50" : "text-gray-700 hover:bg-indigo-50 hover:text-indigo-700")"
+                                @onclick:stopPropagation="true"
+                                @onclick="() => SelectCity(c)">
+                                @c
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+            
+            <div class="flex-1 flex items-center gap-3 px-4 py-2 border-r border-gray-200 relative min-w-0">
+                <svg class="w-4 h-4 text-gray-400 shrink-0 @(_gradeOpen ? "text-indigo-500" : "") transition-colors"
+                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M12 14l9-5-9-5-9 5 9 5zm0 0v6m0-6l-3.5 2M12 14l3.5 2"/>
+                </svg>
+                <div class="flex flex-col w-full min-w-0 cursor-pointer" @onclick="ToggleGradeDropdown">
+                    <label class="text-[10px] font-semibold uppercase tracking-widest text-gray-400 cursor-pointer">Grade Levels</label>
+                    <span class="text-sm @(HasGradeSelection ? "text-gray-800" : "text-gray-300") select-none truncate">
+                        @GradeSelectionLabel
+                    </span>
+                </div>
+                <svg class="w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200 @(_gradeOpen ? "rotate-180" : "")"
+                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+
+                @if (_gradeOpen)
+                {
+                    <div class="absolute top-full left-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 p-3 z-50">
+                        <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2 px-1">Select levels</p>
+                        @foreach (var level in _gradeLevels)
+                        {
+                            var l = level;
+                            <label class="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-indigo-50 cursor-pointer transition-colors group">
+                                <input type="checkbox"
+                                       class="w-4 h-4 rounded accent-indigo-600"
+                                       checked="@l.Selected"
+                                       @onchange="e => OnGradeToggled(l, (bool)(e.Value ?? false))" />
+                                <span class="text-sm text-gray-700 group-hover:text-indigo-700">@l.Label</span>
+                            </label>
+                        }
+                    </div>
+                }
+            </div>
+
+          
+            <div class="px-2 shrink-0">
+                <button
+                    class="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-sm font-semibold px-5 py-3 rounded-xl transition-all duration-150 shadow-sm whitespace-nowrap"
+                    @onclick="EmitSearch">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                              d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
+                    </svg>
+                    Search
+                </button>
+            </div>
+        </div>
+    </div>
+
+    @if (HasAnyFilter)
+    {
+        <div class="flex flex-wrap gap-2 mt-3 px-1">
+            @if (!string.IsNullOrWhiteSpace(_query.NameSearch))
+            {
+                <FilterChip Label="@_query.NameSearch"
+                            OnRemove="() => { _query = _query with { NameSearch = null }; EmitSearch(); }" />
+            }
+            @if (!string.IsNullOrWhiteSpace(_query.City))
+            {
+                <FilterChip Label="@_query.City"
+                            OnRemove="() => { _query = _query with { City = null }; EmitSearch(); }" />
+            }
+            @foreach (var level in _gradeLevels.Where(l => l.Selected))
+            {
+                var captured = level;
+                <FilterChip Label="@captured.Label" OnRemove="() => { captured.Selected = false; RebuildGradeDto(); EmitSearch(); }" />
+            }
+            <button class="text-xs text-gray-400 hover:text-red-500 underline underline-offset-2 transition-colors"
+                    @onclick="ClearAll">
+                Clear all
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public EventCallback<GetSchoolQuery> OnSearch { get; set; }
+
+    private readonly string[] _cities = StaticData.SchoolCreationStaticData.Cities;
+
+    private GetSchoolQuery _query = new(null, null, null);
+    private bool _cityOpen;
+    private bool _gradeOpen;
+
+    private class GradeLevel
+    {
+        public string Label    { get; init; } = "";
+        public string Key      { get; init; } = "";
+        public bool   Selected { get; set;  }
+    }
+
+    private readonly List<GradeLevel> _gradeLevels =
+    [
+        new() { Key = "PreSchool",     Label = "Pre-School"     },
+        new() { Key = "PrimarySchool", Label = "Primary School" },
+        new() { Key = "MiddleSchool",  Label = "Middle School"  },
+        new() { Key = "HighSchool",    Label = "High School"    },
+    ];
+
+    private bool HasGradeSelection => _gradeLevels.Any(l => l.Selected);
+
+    private bool HasAnyFilter =>
+        !string.IsNullOrWhiteSpace(_query.NameSearch) ||
+        !string.IsNullOrWhiteSpace(_query.City)       ||
+        HasGradeSelection;
+
+    private string GradeSelectionLabel
+    {
+        get
+        {
+            var selected = _gradeLevels.Where(l => l.Selected).ToList();
+            return selected.Count == 0 ? "Any level..."    :
+                   selected.Count == 1 ? selected[0].Label :
+                   $"{selected.Count} levels";
+        }
+    }
+
+    private void OnNameChanged(string? value) =>
+        _query = _query with { NameSearch = value };
+
+    private void SelectCity(string? city)
+    {
+        _query    = _query with { City = city };
+        _cityOpen = false;
+    }
+
+    private void OnGradeToggled(GradeLevel level, bool isChecked)
+    {
+        level.Selected = isChecked;
+        RebuildGradeDto();
+    }
+
+    private void RebuildGradeDto()
+    {
+        _query = _query with
+        {
+            GradeLevelOffering = _gradeLevels.Any(l => l.Selected)
+                ? new GradeLevelOfferingDto(
+                    _gradeLevels.First(l => l.Key == "PreSchool").Selected,
+                    _gradeLevels.First(l => l.Key == "PrimarySchool").Selected,
+                    _gradeLevels.First(l => l.Key == "MiddleSchool").Selected,
+                    _gradeLevels.First(l => l.Key == "HighSchool").Selected)
+                : null
+        };
+    }
+
+    private void ToggleCityDropdown()
+    {
+        _cityOpen  = !_cityOpen;
+        _gradeOpen = false;
+    }
+
+    private void ToggleGradeDropdown()
+    {
+        _gradeOpen = !_gradeOpen;
+        _cityOpen  = false;
+    }
+
+    private void EmitSearch()
+    {
+        _cityOpen  = false;
+        _gradeOpen = false;
+        OnSearch.InvokeAsync(_query);
+    }
+
+    private void ClearAll()
+    {
+        _query = new(null, null, null);
+        foreach (var l in _gradeLevels) l.Selected = false;
+        EmitSearch();
+    }
+}

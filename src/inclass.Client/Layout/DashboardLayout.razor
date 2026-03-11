@@ -1,3 +1,4 @@
+@using inclass.Client.Components.Reuse
 @inherits LayoutComponentBase
 <!--
   This example requires updating your template:
@@ -262,6 +263,7 @@
 
     <main class="flex-1 overflow-hidden pt-10 pb-2">
       <div class="mx-auto px-4 sm:px-6 lg:px-8 h-full">
+        <ToastContainer />
         @Body
       </div>
     </main>
