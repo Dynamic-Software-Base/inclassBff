@@ -1,0 +1,26 @@
+﻿@using Contract.InClass.ApiContract
+@using inclass.Client.Services
+
+@inject ApiResultHandler ApiHandler
+@inject ToastService Toast
+
+@code {
+    // Convenience: inject once, use in all pages
+    protected T? Unwrap<T>(ApiResponse<T> response, string? successMessage = null)
+        => ApiHandler.Handle(response, successMessage);
+}
+
+@*Usage
+
+@inherits AppPageBase
+
+@code {
+    private PagedResult<SchoolSummaryDto>? _schools;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var response = await SchoolService.GetSchools(new GetSchoolQuery(null, null, null));
+        _schools = Unwrap(response); // errors auto-toasted, null returned on failure
+    }
+}
+*@

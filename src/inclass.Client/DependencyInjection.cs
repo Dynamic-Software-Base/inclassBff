@@ -17,8 +17,12 @@ public static class DependencyInjection
         services.AddScoped<ApiClient>();
         services.AddScoped<SchoolService>();
         services.AddScoped<FileService>();
+      
         services.AddScoped<AuthenticationStateProvider, BffAuthStateProvider>();
         services.AddScoped<AuthService>();
+        
+        services.AddSingleton<ToastService>();
+        services.AddScoped<ApiResultHandler>();
         return services;
     }
 }

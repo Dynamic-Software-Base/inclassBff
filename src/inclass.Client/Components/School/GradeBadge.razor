@@ -1,0 +1,8 @@
+﻿@* Components/Schools/GradeBadge.razor *@
+<span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100">
+    @Label
+</span>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+}

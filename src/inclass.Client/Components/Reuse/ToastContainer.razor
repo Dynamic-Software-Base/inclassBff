@@ -1,0 +1,59 @@
+﻿@* Components/UI/ToastContainer.razor *@
+@inject ToastService ToastService
+@using inclass.Client.Services
+@implements IDisposable
+
+<div class="toast-container">
+    @foreach (var toast in _toasts)
+    {
+        <div class="toast toast--@toast.Type.ToString().ToLower() @(toast.Removing ? "toast--exit" : "")">
+            @if (toast.Title != null)
+            {
+                <strong>@toast.Title</strong>
+            }
+            <span>@toast.Message</span>
+            <button @onclick="() => Remove(toast)">×</button>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ActiveToast> _toasts = new();
+
+    protected override void OnInitialized()
+    {
+        ToastService.OnToast += AddToast;
+    }
+
+    private void AddToast(ToastNotification n)
+    {
+        var active = new ActiveToast(n);
+        _toasts.Add(active);
+        InvokeAsync(StateHasChanged);
+
+        // Auto-dismiss
+        _ = Task.Delay(n.DurationMs).ContinueWith(_ =>
+        {
+            active.Removing = true;
+            InvokeAsync(StateHasChanged);
+            return Task.Delay(300); // CSS exit animation
+        }).Unwrap().ContinueWith(_ =>
+        {
+            _toasts.Remove(active);
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private void Remove(ActiveToast t) => _toasts.Remove(t);
+
+    public void Dispose() => ToastService.OnToast -= AddToast;
+
+    private class ActiveToast(ToastNotification n)
+    {
+        public ToastNotification Notification { get; } = n;
+        public string Message => Notification.Message;
+        public string? Title => Notification.Title;
+        public ToastType Type => Notification.Type;
+        public bool Removing { get; set; }
+    }
+}

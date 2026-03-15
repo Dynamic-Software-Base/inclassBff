@@ -120,9 +120,11 @@ builder.Services.AddReverseProxy()
     {
         transformBuilder.AddRequestTransform(async context =>
         {
-            // Works because SaveTokens = true and tokens live in the server-side ticket store
-            var accessToken = await context.HttpContext.GetTokenAsync("access_token");
+            // Skip token injection for anonymous public routes
+            if (context.HttpContext.Request.Path.StartsWithSegments("/public"))
+                return;
 
+            var accessToken = await context.HttpContext.GetTokenAsync("access_token");
             if (!string.IsNullOrEmpty(accessToken))
             {
                 context.ProxyRequest.Headers.Authorization =
