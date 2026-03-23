@@ -48,7 +48,9 @@ public class ApiClient
                 request.Content = JsonContent.Create(body);
 
             var response = await _httpClient.SendAsync(request);
-            var content  = await response.Content.ReadFromJsonAsync<ApiResponse<T>>(JsonOptions); // ← here
+            var rawJson = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"[ApiClient] RAW: {rawJson}");
+            var content = System.Text.Json.JsonSerializer.Deserialize<ApiResponse<T>>(rawJson, JsonOptions);
         
             return content ?? ApiResponse<T>.Failure([new ApiError
             {

@@ -1,0 +1,12 @@
+﻿@* StepHeader.razor *@
+@* Usage: <StepHeader Title="General Information" Subtitle="Tell us the basics." /> *@
+
+<div class="mb-6">
+    <h2 class="text-base font-semibold text-gray-900">@Title</h2>
+    <p class="text-sm text-gray-500 mt-0.5">@Subtitle</p>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title    { get; set; } = "";
+    [Parameter, EditorRequired] public string Subtitle { get; set; } = "";
+}
