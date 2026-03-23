@@ -1,360 +1,598 @@
-﻿@page "/Create"
-@inject FileService  FileService   
-@using inclass.Client.Components.Reuse
-@using inclass.Client.Services
-@using static inclass.Client.Helpers.StaticData.SchoolCreationStaticData
+﻿@page "/schools/create"
 @layout DashboardLayout
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using inclass.Client.Services
+@using inclass.Client.Components.Reuse
+@using inclass.Client.Components.School
+@using inclass.Client.Helpers
+@using Contract.InClass.Request.School
+@using Contract.InClass.Response.School.EducationalSystem
+@inject SchoolService SchoolService
+@inject EducationalSystemService EduService
+@inject NavigationManager Nav
+@inject ApiResultHandler ResultHandler
 
-<div class="h-full flex flex-col lg:flex-row gap-4">
-    
-    <!-- Form Container (2/3 width on desktop) -->
-    <div class="flex-1 lg:w-2/3 bg-white rounded-lg shadow-sm overflow-y-auto">
-        <div class="p-6">
-            <!-- Header -->
-            <div class="mb-6 flex items-center justify-between">
-                <h1 class="text-2xl font-bold text-gray-900">Create a school</h1>
-                
-                <!-- Mobile Widget Toggle Button -->
-                <button 
-                    type="button"
-                    @onclick="ToggleWidget"
-                    class="lg:hidden inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                    </svg>
-                </button>
+<PageTitle>Create School — InClass</PageTitle>
+
+<div class="flex font-sans bg-[#f2f2f3] -m-7 min-h-[calc(100dvh-60px)]">
+
+    <!-- ── Left progress panel ──────────────────────────────────────── -->
+    <aside class="w-[260px] shrink-0 bg-white border-r border-gray-200 sticky top-0 h-[calc(100dvh-60px)] overflow-y-auto hidden lg:block">
+        <div class="flex flex-col gap-7 p-7">
+
+            <a href="/schools" class="inline-flex items-center gap-2 text-[13px] font-medium text-gray-400 hover:text-gray-700 transition-colors no-underline">
+                <i class="fa-solid fa-arrow-left text-xs"></i>
+                Back to schools
+            </a>
+
+            <div>
+                <h1 class="text-xl font-bold text-gray-900 tracking-tight m-0 mb-1">New School</h1>
+                <p class="text-[12px] text-gray-400 m-0 leading-snug">Complete all steps to publish your school on InClass.</p>
             </div>
 
-            <!-- Form Content -->
-            <EditForm Model="@school" FormName="School Creation" OnValidSubmit="CreateSchool">
-                <DataAnnotationsValidator/>
-                
-                <div class="space-y-8">
-                    
-                    <!-- General Information Section -->
-                    <div class="border-b border-gray-200 pb-8">
-                        <h2 class="text-lg font-semibold text-gray-900 mb-4">General Information</h2>
-                        
-                        <div class="space-y-4">
-                            <!-- School Name -->
-                            <div>
-                                <label for="name" class="block text-sm font-medium text-gray-700 mb-1">
-                                    School Name <span class="text-red-500">*</span>
-                                </label>
-                                <InputText 
-                                    id="name" 
-                                    @bind-Value="school.Name" 
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
-                                    placeholder="Enter school name" />
-                                <ValidationMessage For="@(() => school.Name)" class="text-red-600 text-sm mt-1" />
-                            </div>
-
-                            <!-- Arabic Name -->
-                            <div>
-                                <label for="arName" class="block text-sm font-medium text-gray-700 mb-1">
-                                    Arabic Name
-                                </label>
-                                <InputText 
-                                    id="arName" 
-                                    @bind-Value="school.Ar_Name" 
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
-                                    placeholder="أدخل اسم المدرسة بالعربية" />
-                            </div>
-
-                            <!-- Description -->
-                            <div>
-                                <label for="description" class="block text-sm font-medium text-gray-700 mb-1">
-                                    Description
-                                </label>
-                                <InputTextArea 
-                                    id="description" 
-                                    @bind-Value="school.Description" 
-                                    rows="4"
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
-                                    placeholder="Enter school description" />
-                            </div>
+            <ol class="list-none m-0 p-0 flex flex-col gap-1">
+                @for (int i = 0; i < _steps.Length; i++)
+                {
+                    int idx = i;
+                    var state = StepState(idx);
+                    <li class="flex items-center gap-3 px-2.5 py-2.5 rounded-xl transition-colors @(idx <= _currentStep ? "cursor-pointer hover:bg-gray-50" : "cursor-default")"
+                        @onclick="() => TryGoToStep(idx)">
+                        <div class="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 transition-all
+                            @(state == "done"   ? "bg-gray-900 text-white" :
+                              state == "active" ? "bg-gray-900 text-white shadow-[0_0_0_4px_rgba(17,24,39,0.1)]" :
+                                                  "bg-gray-100 text-gray-400 border border-gray-200")">
+                            @if (state == "done") { <i class="fa-solid fa-check text-[10px]"></i> }
+                            else { <span>@(idx + 1)</span> }
                         </div>
-                    </div>
-
-                    <!-- Address Section -->
-                    <div class="border-b border-gray-200 pb-8">
-                        <h2 class="text-lg font-semibold text-gray-900 mb-4">Address</h2>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <!-- Region -->
-                            <div class="md:col-span-2">
-                                <label for="region" class="block text-sm font-medium text-gray-700 mb-1">
-                                    Region <span class="text-red-500">*</span>
-                                </label>
-                                <InputSelect 
-                                    id="region" 
-                                    @bind-Value="school.Address.Region" 
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
-                                    <option value="">Select a region</option>
-                                    @foreach (var region in Regions)
-                                    {
-                                        <option value="@region">@region</option>
-                                    }
-                                </InputSelect>
-                            </div>
-
-                            <!-- Province -->
-                            <div>
-                                <label for="province" class="block text-sm font-medium text-gray-700 mb-1">
-                                    Province <span class="text-red-500">*</span>
-                                </label>
-                                <InputSelect 
-                                    id="province" 
-                                    @bind-Value="school.Address.Province" 
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
-                                    <option value="">Select a province</option>
-                                    @foreach (var province in Provinces)
-                                    {
-                                        <option value="@province">@province</option>
-                                    }
-                                </InputSelect>
-                            </div>
-
-                            <!-- City -->
-                            <div>
-                                <label for="city" class="block text-sm font-medium text-gray-700 mb-1">
-                                    City <span class="text-red-500">*</span>
-                                </label>
-                                <InputSelect 
-                                    id="city" 
-                                    @bind-Value="school.Address.City" 
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
-                                    <option value="">Select a city</option>
-                                    @foreach (var city in Cities)
-                                    {
-                                        <option value="@city">@city</option>
-                                    }
-                                </InputSelect>
-                            </div>
-
-                            <!-- Street Address -->
-                            <div class="md:col-span-2">
-                                <label for="streetAddress" class="block text-sm font-medium text-gray-700 mb-1">
-                                    Street Address
-                                </label>
-                                <InputText 
-                                    id="streetAddress" 
-                                    @bind-Value="school.Address.StreetAddress" 
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
-                                    placeholder="Enter street address" />
-                            </div>
-
-                            <!-- Building Number -->
-                            <div>
-                                <label for="buildingNumber" class="block text-sm font-medium text-gray-700 mb-1">
-                                    Building Number
-                                </label>
-                                <InputText 
-                                    id="buildingNumber" 
-                                    @bind-Value="school.Address.BuildingNumber" 
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
-                                    placeholder="Building #" />
-                            </div>
-
-                            <!-- Apartment Number -->
-                            <div>
-                                <label for="apartmentNumber" class="block text-sm font-medium text-gray-700 mb-1">
-                                    Apartment Number
-                                </label>
-                                <InputText 
-                                    id="apartmentNumber" 
-                                    @bind-Value="school.Address.ApartmentNumber" 
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
-                                    placeholder="Apt #" />
-                            </div>
-
-                            <!-- Postal Code -->
-                            <div>
-                                <label for="postalCode" class="block text-sm font-medium text-gray-700 mb-1">
-                                    Postal Code
-                                </label>
-                                <InputText 
-                                    id="postalCode" 
-                                    @bind-Value="school.Address.PostalCode" 
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
-                                    placeholder="Enter postal code" />
-                            </div>
+                        <div class="flex flex-col gap-0.5">
+                            <span class="text-[13px] font-semibold
+                                @(state == "active" ? "text-gray-900" : state == "done" ? "text-gray-700" : "text-gray-400")">
+                                @_steps[idx].Name
+                            </span>
+                            <span class="text-[11px] @(state == "active" ? "text-gray-500" : "text-gray-300")">
+                                @_steps[idx].Hint
+                            </span>
                         </div>
-                    </div>
-<!-- Contact Information Section -->
-<!-- Insert this section between Address Section and Grade Levels Section -->
+                    </li>
+                }
+            </ol>
 
-                    <!-- Contact Information Section -->
-                    <div class="border-b border-gray-200 pb-8">
-                        <h2 class="text-lg font-semibold text-gray-900 mb-4">Contact Information</h2>
-                        
-                        <div class="space-y-4">
-                            <!-- Email -->
-                            <div>
-                                <label for="email" class="block text-sm font-medium text-gray-700 mb-1">
-                                    Email <span class="text-red-500">*</span>
-                                </label>
-                                <div class="relative">
-                                    <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
-                                        <svg class="w-4 h-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
-                                            <path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="m3.5 5.5 7.893 6.036a1 1 0 0 0 1.214 0L20.5 5.5M4 19h16a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1Z"/>
-                                        </svg>
-                                    </div>
-                                    <InputText 
-                                        id="email" 
-                                        type="email"
-                                        @bind-Value="school.ContactInfo.Email" 
-                                        class="block w-full ps-9 pe-3 py-2 border border-gray-300 text-gray-900 text-sm rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm placeholder:text-gray-400" 
-                                        placeholder="school@example.com" />
-                                </div>
-                                <ValidationMessage For="@(() => school.ContactInfo.Email)" class="text-red-600 text-sm mt-1" />
-                            </div>
-
-                            <!-- Primary Phone Number -->
-                            <PhoneNumberInput 
-                                Id="primaryPhone"
-                                Label="Primary Phone Number"
-                                @bind-Value="school.ContactInfo.PrimaryPhoneNumber"
-                                Required="true"
-                                Placeholder="0612345678" />
-
-                            <!-- Secondary Phone Number -->
-                            <PhoneNumberInput 
-                                Id="secondaryPhone"
-                                Label="Secondary Phone Number (Optional)"
-                                @bind-Value="school.ContactInfo.SecondaryPhoneNumber"
-                                Required="false"
-                                Placeholder="0512345678" />
-                        </div>
-                    </div>
-                    <!-- Grade Levels Section -->
-                    <div class="border-b border-gray-200 pb-8">
-                        <h2 class="text-lg font-semibold text-gray-900 mb-4">Grade Levels Offered</h2>
-                        
-                        <div class="space-y-3">
-                            <!-- Pre-School -->
-                            <div class="flex items-center">
-                                <InputCheckbox 
-                                    id="hasPreSchool" 
-                                    @bind-Value="school.GradeLevels.HasPreSchool" 
-                                    class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
-                                <label for="hasPreSchool" class="ml-3 block text-sm font-medium text-gray-700">
-                                    Pre-School
-                                </label>
-                            </div>
-
-                            <!-- Primary School -->
-                            <div class="flex items-center">
-                                <InputCheckbox 
-                                    id="hasPrimarySchool" 
-                                    @bind-Value="school.GradeLevels.HasPrimarySchool" 
-                                    class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
-                                <label for="hasPrimarySchool" class="ml-3 block text-sm font-medium text-gray-700">
-                                    Primary School
-                                </label>
-                            </div>
-
-                            <!-- Middle School -->
-                            <div class="flex items-center">
-                                <InputCheckbox 
-                                    id="hasMiddleSchool" 
-                                    @bind-Value="school.GradeLevels.HasMiddleSchool" 
-                                    class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
-                                <label for="hasMiddleSchool" class="ml-3 block text-sm font-medium text-gray-700">
-                                    Middle School
-                                </label>
-                            </div>
-
-                            <!-- High School -->
-                            <div class="flex items-center">
-                                <InputCheckbox 
-                                    id="hasHighSchool" 
-                                    @bind-Value="school.GradeLevels.HasHighSchool" 
-                                    class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
-                                <label for="hasHighSchool" class="ml-3 block text-sm font-medium text-gray-700">
-                                    High School
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- School Pictures Section -->
-                    <!-- Insert this section after the Grade Levels Section, before Form Actions -->
-
-                    <!-- School Pictures Section -->
-                    <div class="border-b border-gray-200 pb-8">
-                        <h2 class="text-lg font-semibold text-gray-900 mb-4">School Pictures</h2>
-                        
-                        <SchoolPictureSelector @bind-SelectedPictures="school.Pictures" />
-                    </div>
-                    <!-- Form Actions -->
-                    <div class="flex justify-end gap-3 pt-4">
-                        <button 
-                            type="button" 
-                            class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
-                            Cancel
-                        </button>
-                        <button 
-                            type="submit" 
-                            class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
-                            Create School
-                        </button>
-                    </div>
-
+            <div class="flex flex-col gap-1.5">
+                <div class="h-[3px] bg-gray-100 rounded-full overflow-hidden">
+                    <div class="h-full bg-gray-900 rounded-full transition-all duration-300"
+                         style="width: @(_currentStep == 0 ? 0 : _currentStep == 1 ? 50 : 100)%"></div>
                 </div>
-                
-            </EditForm>
-        </div>
-    </div>
+                <span class="text-[11px] text-gray-400 font-medium">Step @(_currentStep + 1) of @_steps.Length</span>
+            </div>
 
-    <!-- Widget Container (1/3 width on desktop, overlay on mobile) -->
-    <div class="@GetWidgetClasses()">
-        <!-- Mobile Close Button -->
-        <div class="lg:hidden p-4 border-b border-gray-200 flex justify-between items-center">
-            <h2 class="text-lg font-semibold text-gray-900">Widget</h2>
-            <button 
-                type="button"
-                @onclick="ToggleWidget"
-                class="text-gray-400 hover:text-gray-500">
-                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-            </button>
+        </div>
+    </aside>
+
+    <!-- ── Right form panel ─────────────────────────────────────────── -->
+    <main class="flex-1 min-w-0 p-7 flex flex-col">
+
+        <!-- Mobile step pills -->
+        <div class="w-full mb-5 lg:hidden">
+            <div class="flex items-center gap-2 overflow-x-auto pb-1">
+                @for (int i = 0; i < _steps.Length; i++)
+                {
+                    int idx = i;
+                    var state = StepState(idx);
+                    <button @onclick="() => TryGoToStep(idx)"
+                            class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold shrink-0 transition-colors
+                                @(state == "active" ? "bg-gray-900 text-white" :
+                                  state == "done"   ? "bg-gray-100 text-gray-600" :
+                                                      "bg-gray-50 text-gray-400")">
+                        @if (state == "done") { <i class="fa-solid fa-check text-[10px]"></i> }
+                        @_steps[idx].Name
+                    </button>
+                }
+            </div>
         </div>
 
-        <!-- Widget Content -->
-        <div class="p-6">
-            <!-- Widget content will go here -->
-            <p class="text-sm text-gray-500">Widget content area</p>
-        </div>
-    </div>
+        <div class="w-full bg-white rounded-2xl border border-gray-200 overflow-hidden flex flex-col">
 
-    <!-- Mobile Overlay Background -->
-    @if (isWidgetOpen)
-    {
-        <div 
-            class="lg:hidden fixed inset-0 bg-gray-600 bg-opacity-50 z-40"
-            @onclick="ToggleWidget">
+            <!-- Step header -->
+            <div class="px-8 pt-6 pb-5 border-b border-gray-100">
+                <span class="text-[11px] font-bold text-gray-400 uppercase tracking-widest">@(_currentStep + 1) / @_steps.Length</span>
+                <h2 class="text-lg font-bold text-gray-900 tracking-tight mt-0.5 mb-0.5">@_steps[_currentStep].Name</h2>
+                <p class="text-[13px] text-gray-400 m-0">@_steps[_currentStep].Hint</p>
+            </div>
+
+            <!-- Form body -->
+            <div class="px-8 py-6 flex-1">
+
+                <!-- ════════════════════════════════════════════════
+                     STEP 0 — School Info + Location + Contact
+                     ════════════════════════════════════════════════ -->
+                @if (_currentStep == 0)
+                {
+                    <div class="flex flex-col gap-7">
+
+                        <!-- General -->
+                        <div>
+                            <div class="flex items-center gap-2 mb-4">
+                                <span class="w-5 h-5 rounded-md bg-gray-900 flex items-center justify-center shrink-0">
+                                    <i class="fa-solid fa-school text-white text-[9px]"></i>
+                                </span>
+                                <h3 class="text-[11px] font-bold text-gray-500 uppercase tracking-wider m-0">General</h3>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="flex flex-col gap-1.5">
+                                    <label class="text-[13px] font-semibold text-gray-700">School name <span class="text-red-400">*</span></label>
+                                    <input @bind="_dto.Name" @bind:event="oninput"
+                                           placeholder="e.g. École Al Amal"
+                                           class="@InputCls(HasError("Name"))" />
+                                    @ErrorMsg("Name")
+                                </div>
+                                <div class="flex flex-col gap-1.5">
+                                    <label class="text-[13px] font-semibold text-gray-700 flex items-center gap-1.5">Arabic name @OptionalBadge</label>
+                                    <input @bind="_dto.Ar_Name" dir="rtl"
+                                           placeholder="اسم المدرسة بالعربية"
+                                           class="@InputCls(HasError("Ar_Name")) text-right" />
+                                    @ErrorMsg("Ar_Name")
+                                </div>
+                                <div class="col-span-2 flex flex-col gap-1.5">
+                                    <label class="text-[13px] font-semibold text-gray-700 flex items-center gap-1.5">Description @OptionalBadge</label>
+                                    <textarea @bind="_dto.Description" rows="2"
+                                              placeholder="A short description visible to parents searching for schools..."
+                                              class="@InputCls(false) resize-none"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="border-t border-dashed border-gray-100"></div>
+
+                        <!-- Location -->
+                        <div>
+                            <div class="flex items-center gap-2 mb-4">
+                                <span class="w-5 h-5 rounded-md bg-gray-900 flex items-center justify-center shrink-0">
+                                    <i class="fa-solid fa-location-dot text-white text-[9px]"></i>
+                                </span>
+                                <h3 class="text-[11px] font-bold text-gray-500 uppercase tracking-wider m-0">Location</h3>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="col-span-2 flex flex-col gap-1.5">
+                                    <label class="text-[13px] font-semibold text-gray-700">Street address <span class="text-red-400">*</span></label>
+                                    <input @bind="_dto.Address.StreetAddress" placeholder="Rue Mohammed V"
+                                           class="@InputCls(HasError("Address.StreetAddress"))" />
+                                    @ErrorMsg("Address.StreetAddress")
+                                </div>
+                                <div class="flex flex-col gap-1.5">
+                                    <label class="text-[13px] font-semibold text-gray-700 flex items-center gap-1.5">Building no. @OptionalBadge</label>
+                                    <input @bind="_dto.Address.BuildingNumber" placeholder="12" class="@InputCls(false)" />
+                                </div>
+                                <div class="flex flex-col gap-1.5">
+                                    <label class="text-[13px] font-semibold text-gray-700 flex items-center gap-1.5">Apartment @OptionalBadge</label>
+                                    <input @bind="_dto.Address.ApartmentNumber" placeholder="Apt 3A" class="@InputCls(false)" />
+                                </div>
+                                <div class="flex flex-col gap-1.5">
+                                    <label class="text-[13px] font-semibold text-gray-700">City <span class="text-red-400">*</span></label>
+                                    <input @bind="_dto.Address.City" placeholder="Casablanca"
+                                           class="@InputCls(HasError("Address.City"))" />
+                                    @ErrorMsg("Address.City")
+                                </div>
+                                <div class="flex flex-col gap-1.5">
+                                    <label class="text-[13px] font-semibold text-gray-700">Postal code <span class="text-red-400">*</span></label>
+                                    <input @bind="_dto.Address.PostalCode" placeholder="20000"
+                                           class="@InputCls(HasError("Address.PostalCode"))" />
+                                    @ErrorMsg("Address.PostalCode")
+                                </div>
+                                <div class="flex flex-col gap-1.5">
+                                    <label class="text-[13px] font-semibold text-gray-700">Province <span class="text-red-400">*</span></label>
+                                    <select @bind="_dto.Address.Province" class="@SelectCls(HasError("Address.Province"))">
+                                        <option value="">Select province...</option>
+                                        @foreach (var p in StaticData.SchoolCreationStaticData.Provinces)
+                                        { <option value="@p">@p</option> }
+                                    </select>
+                                    @ErrorMsg("Address.Province")
+                                </div>
+                                <div class="flex flex-col gap-1.5">
+                                    <label class="text-[13px] font-semibold text-gray-700">Region <span class="text-red-400">*</span></label>
+                                    <select @bind="_dto.Address.Region" class="@SelectCls(HasError("Address.Region"))">
+                                        <option value="">Select region...</option>
+                                        @foreach (var r in StaticData.SchoolCreationStaticData.Regions)
+                                        { <option value="@r">@r</option> }
+                                    </select>
+                                    @ErrorMsg("Address.Region")
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="border-t border-dashed border-gray-100"></div>
+
+                        <!-- Contact -->
+                        <div>
+                            <div class="flex items-center gap-2 mb-4">
+                                <span class="w-5 h-5 rounded-md bg-gray-900 flex items-center justify-center shrink-0">
+                                    <i class="fa-solid fa-phone text-white text-[9px]"></i>
+                                </span>
+                                <h3 class="text-[11px] font-bold text-gray-500 uppercase tracking-wider m-0">Contact</h3>
+                            </div>
+                            <div class="grid grid-cols-3 gap-4">
+                                <div class="flex flex-col gap-1.5">
+                                    <label class="text-[13px] font-semibold text-gray-700">Email <span class="text-red-400">*</span></label>
+                                    <div class="relative">
+                                        <i class="fa-regular fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 text-[12px] pointer-events-none"></i>
+                                        <input @bind="_dto.ContactInfo.Email" type="email" placeholder="contact@school.ma"
+                                               class="@InputCls(HasError("ContactInfo.Email")) pl-8" />
+                                    </div>
+                                    @ErrorMsg("ContactInfo.Email")
+                                </div>
+                                <div class="flex flex-col gap-1.5">
+                                    <label class="text-[13px] font-semibold text-gray-700">Primary phone <span class="text-red-400">*</span></label>
+                                    <div class="relative">
+                                        <i class="fa-solid fa-phone absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 text-[12px] pointer-events-none"></i>
+                                        <input @bind="_dto.ContactInfo.PrimaryPhoneNumber" type="tel" placeholder="0612345678"
+                                               class="@InputCls(HasError("ContactInfo.PrimaryPhoneNumber")) pl-8" />
+                                    </div>
+                                    @ErrorMsg("ContactInfo.PrimaryPhoneNumber")
+                                </div>
+                                <div class="flex flex-col gap-1.5">
+                                    <label class="text-[13px] font-semibold text-gray-700 flex items-center gap-1">Secondary phone @OptionalBadge</label>
+                                    <div class="relative">
+                                        <i class="fa-solid fa-phone absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 text-[12px] pointer-events-none"></i>
+                                        <input @bind="_dto.ContactInfo.SecondaryPhoneNumber" type="tel" placeholder="0512345678"
+                                               class="@InputCls(HasError("ContactInfo.SecondaryPhoneNumber")) pl-8" />
+                                    </div>
+                                    @ErrorMsg("ContactInfo.SecondaryPhoneNumber")
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                }
+
+                <!-- ════════════════════════════════════════════════
+                     STEP 1 — Curriculum
+                     ════════════════════════════════════════════════ -->
+                @if (_currentStep == 1)
+                {
+                    @if (_eduLoading)
+                    {
+                        <div class="flex flex-col gap-3">
+                            @for (int s = 0; s < 4; s++)
+                            {
+                                <div class="rounded-xl overflow-hidden flex flex-col gap-0.5">
+                                    <div class="h-11 rounded-t-xl bg-gray-100 animate-pulse"></div>
+                                    @for (int g = 0; g < 3; g++)
+                                    { <div class="h-9 bg-gray-50 animate-pulse"></div> }
+                                </div>
+                            }
+                        </div>
+                    }
+                    else if (_educationalSystem is null)
+                    {
+                        <div class="flex flex-col items-center gap-3 py-14 text-center">
+                            <i class="fa-solid fa-triangle-exclamation text-2xl text-amber-400"></i>
+                            <p class="text-[13px] text-gray-400 m-0">Could not load curriculum data. Please refresh and try again.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="flex flex-col gap-3">
+                            @if (_selectedGradeIds.Count > 0)
+                            {
+                                <div class="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-[13px] font-medium text-green-700 mb-1">
+                                    <i class="fa-solid fa-circle-check"></i>
+                                    <span>@_selectedGradeIds.Count grade@(_selectedGradeIds.Count == 1 ? "" : "s") selected</span>
+                                    <button class="ml-auto text-[12px] text-gray-400 hover:text-gray-600 underline bg-transparent border-none cursor-pointer font-[inherit]"
+                                            @onclick="ClearAllGrades">Clear all</button>
+                                </div>
+                            }
+
+                            @foreach (var cycle in _educationalSystem.Cycles.OrderBy(c => c.SortOrder))
+                            {
+                                bool allSelected  = cycle.Grades.All(g => _selectedGradeIds.Contains(g.Id));
+                                bool someSelected = !allSelected && cycle.Grades.Any(g => _selectedGradeIds.Contains(g.Id));
+                                bool isOpen       = _openCycles.Contains(cycle.Id);
+
+                                <div class="border @(someSelected || allSelected ? "border-gray-300" : "border-gray-100") rounded-xl overflow-hidden transition-colors">
+                                    <div class="flex items-center bg-gray-50 border-b border-gray-100">
+                                        <label class="flex items-center justify-center px-3.5 py-3 cursor-pointer">
+                                            <input type="checkbox" checked="@allSelected"
+                                                   @onchange="(e) => ToggleCycle(cycle, (bool)e.Value!)"
+                                                   class="w-[15px] h-[15px] accent-gray-900 cursor-pointer" />
+                                        </label>
+                                        <button class="flex-1 flex items-center justify-between pr-3.5 py-3 bg-transparent border-none cursor-pointer text-left font-[inherit]"
+                                                @onclick="() => ToggleCycleOpen(cycle.Id)">
+                                            <div class="flex items-center gap-2.5">
+                                                <span class="text-[13px] font-semibold text-gray-900">@cycle.Name_Fr</span>
+                                                <span class="text-[12px] text-gray-400" dir="rtl">@cycle.Name_Ar</span>
+                                            </div>
+                                            <div class="flex items-center gap-2.5">
+                                                @if (someSelected || allSelected)
+                                                {
+                                                    <span class="text-[11px] font-bold text-gray-900 bg-gray-200 px-2 py-0.5 rounded-full">
+                                                        @_selectedGradeIds.Count(id => cycle.Grades.Any(g => g.Id == id))/@cycle.Grades.Count
+                                                    </span>
+                                                }
+                                                <i class="fa-solid fa-chevron-down text-[10px] text-gray-400 transition-transform duration-200 @(isOpen ? "rotate-180" : "")"></i>
+                                            </div>
+                                        </button>
+                                    </div>
+                                    <div class="grid transition-all duration-200 @(isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]")">
+                                        <div class="overflow-hidden">
+                                            @foreach (var grade in cycle.Grades.OrderBy(g => g.SortOrder))
+                                            {
+                                                bool gradeSelected = _selectedGradeIds.Contains(grade.Id);
+                                                <label class="flex items-center gap-3 px-3.5 py-2.5 cursor-pointer border-t border-gray-50 transition-colors @(gradeSelected ? "bg-gray-50" : "hover:bg-gray-50/60")">
+                                                    <input type="checkbox" checked="@gradeSelected"
+                                                           @onchange="(e) => ToggleGrade(grade.Id, (bool)e.Value!)"
+                                                           class="w-[15px] h-[15px] accent-gray-900 cursor-pointer" />
+                                                    <span class="text-[13px] flex-1 @(gradeSelected ? "font-medium text-gray-900" : "text-gray-600")">@grade.Name_Fr</span>
+                                                    <span class="text-[12px] text-gray-300" dir="rtl">@grade.Name_Ar</span>
+                                                </label>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                        @ErrorMsg("SupportedGradeIds")
+                    }
+                }
+
+                <!-- ════════════════════════════════════════════════
+                     STEP 2 — Pictures
+                     ════════════════════════════════════════════════ -->
+                @if (_currentStep == 2)
+                {
+                    <SchoolPictureSelector @bind-SelectedPictures="_dto.Pictures" />
+                    @ErrorMsg("Pictures")
+                }
+
+            </div>
+
+            <!-- Footer -->
+            <div class="px-8 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-3">
+                <button class="inline-flex items-center gap-1.5 px-4 py-2 text-[13px] font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        @onclick="PreviousStep" disabled="@(_currentStep == 0)">
+                    <i class="fa-solid fa-arrow-left text-xs"></i>
+                    Back
+                </button>
+
+                <div class="flex items-center gap-3">
+                    @if (_stepErrors.Count > 0)
+                    {
+                        <span class="text-[12px] text-red-400 font-medium flex items-center gap-1.5">
+                            <i class="fa-solid fa-circle-exclamation"></i>
+                            Fix @(_stepErrors.Count) error@(_stepErrors.Count == 1 ? "" : "s") to continue
+                        </span>
+                    }
+                    @if (_currentStep < _steps.Length - 1)
+                    {
+                        <button class="inline-flex items-center gap-1.5 px-5 py-2 text-[13px] font-semibold text-white bg-gray-900 rounded-lg hover:bg-gray-800 hover:shadow-md transition-all"
+                                @onclick="NextStep">
+                            Continue
+                            <i class="fa-solid fa-arrow-right text-xs"></i>
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="inline-flex items-center gap-2 px-6 py-2 text-[13px] font-semibold text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                @onclick="SubmitAsync" disabled="@_submitting">
+                            @if (_submitting)
+                            {
+                                <span class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                                <span>Creating...</span>
+                            }
+                            else
+                            {
+                                <i class="fa-solid fa-circle-check text-sm"></i>
+                                <span>Create school</span>
+                            }
+                        </button>
+                    }
+                </div>
+            </div>
+
         </div>
-    }
+    </main>
 </div>
 
 @code {
-    private bool isWidgetOpen = false;
+    private record StepDef(string Name, string Hint);
 
-    private void ToggleWidget()
+    private static readonly StepDef[] _steps =
+    [
+        new("School Info",  "General · Location · Contact"),
+        new("Curriculum",   "Grades offered"),
+        new("Pictures",     "School photos"),
+    ];
+
+    private int  _currentStep = 0;
+    private bool _eduLoading  = true;
+    private bool _submitting  = false;
+
+    private CreateSchoolRequestDto     _dto               = new();
+    private EducationalSystemResponse? _educationalSystem = null;
+    private HashSet<Guid>              _selectedGradeIds  = [];
+    private HashSet<Guid>              _openCycles        = [];
+    private Dictionary<string, string> _stepErrors        = [];
+
+    protected override async Task OnInitializedAsync()
     {
-        isWidgetOpen = !isWidgetOpen;
+        var result = await EduService.GetDefaultAsync();
+        _educationalSystem = ResultHandler.Handle(result);
+
+        if (_educationalSystem is not null)
+        {
+            _dto.EducationalSystemId = _educationalSystem.Id;
+            var first = _educationalSystem.Cycles.OrderBy(c => c.SortOrder).FirstOrDefault();
+            if (first is not null) _openCycles.Add(first.Id);
+        }
+
+        _eduLoading = false;
     }
 
-    private string GetWidgetClasses()
+    private void TryGoToStep(int idx)
     {
-        var baseClasses = "bg-white rounded-lg shadow-sm overflow-y-auto";
-        var desktopClasses = "lg:block lg:w-1/3 lg:relative lg:z-0";
-        var mobileClasses = isWidgetOpen 
-            ? "fixed top-0 right-0 bottom-0 w-80 z-50 transform translate-x-0" 
-            : "hidden";
-        
-        return $"{baseClasses} {desktopClasses} {mobileClasses}";
+        if (idx <= _currentStep) _currentStep = idx;
     }
-    
+
+    private void NextStep()
+    {
+        _stepErrors = ValidateCurrentStep();
+        if (_stepErrors.Count > 0) return;
+        if (_currentStep < _steps.Length - 1) _currentStep++;
+    }
+
+    private void PreviousStep()
+    {
+        _stepErrors.Clear();
+        if (_currentStep > 0) _currentStep--;
+    }
+
+    private void ToggleGrade(Guid gradeId, bool selected)
+    {
+        if (selected) _selectedGradeIds.Add(gradeId);
+        else _selectedGradeIds.Remove(gradeId);
+        _dto.SupportedGradeIds = [.. _selectedGradeIds];
+    }
+
+    private void ToggleCycle(CycleResponse cycle, bool selected)
+    {
+        foreach (var grade in cycle.Grades) ToggleGrade(grade.Id, selected);
+    }
+
+    private void ToggleCycleOpen(Guid cycleId)
+    {
+        if (!_openCycles.Add(cycleId)) _openCycles.Remove(cycleId);
+    }
+
+    private void ClearAllGrades()
+    {
+        _selectedGradeIds.Clear();
+        _dto.SupportedGradeIds = [];
+    }
+
+    private Dictionary<string, string> ValidateCurrentStep() => _currentStep switch
+    {
+        0 => ValidateInfoStep(),
+        1 => ValidateCurriculum(),
+        2 => ValidatePictures(),
+        _ => []
+    };
+
+    private Dictionary<string, string> ValidateInfoStep()
+    {
+        var e = new Dictionary<string, string>();
+        var phoneRegex = new System.Text.RegularExpressions.Regex(@"^\d{10}$");
+
+        // General
+        if (string.IsNullOrWhiteSpace(_dto.Name))
+            e["Name"] = "School name is required.";
+        else if (_dto.Name.Length < 5)
+            e["Name"] = "Name must be at least 5 characters.";
+        else if (_dto.Name.Length > 200)
+            e["Name"] = "Name must be under 200 characters.";
+
+        if (!string.IsNullOrEmpty(_dto.Ar_Name))
+        {
+            if (_dto.Ar_Name.Length > 200)
+                e["Ar_Name"] = "Arabic name must be under 200 characters.";
+            else if (!System.Text.RegularExpressions.Regex.IsMatch(_dto.Ar_Name, @"^[\u0600-\u06FF\s]+$"))
+                e["Ar_Name"] = "Must contain only Arabic characters.";
+        }
+
+        // Location
+        var a = _dto.Address;
+        if (string.IsNullOrWhiteSpace(a.StreetAddress)) e["Address.StreetAddress"] = "Street address is required.";
+        if (string.IsNullOrWhiteSpace(a.City))          e["Address.City"]          = "City is required.";
+        if (string.IsNullOrWhiteSpace(a.Province))      e["Address.Province"]      = "Please select a province.";
+        if (string.IsNullOrWhiteSpace(a.Region))        e["Address.Region"]        = "Please select a region.";
+        if (string.IsNullOrWhiteSpace(a.PostalCode))    e["Address.PostalCode"]    = "Postal code is required.";
+
+        // Contact
+        var c = _dto.ContactInfo;
+        if (string.IsNullOrWhiteSpace(c.Email))
+            e["ContactInfo.Email"] = "Email is required.";
+        else if (!c.Email.Contains('@'))
+            e["ContactInfo.Email"] = "Invalid email address.";
+
+        if (string.IsNullOrWhiteSpace(c.PrimaryPhoneNumber))
+            e["ContactInfo.PrimaryPhoneNumber"] = "Primary phone is required.";
+        else if (!phoneRegex.IsMatch(c.PrimaryPhoneNumber))
+            e["ContactInfo.PrimaryPhoneNumber"] = "Must be exactly 10 digits.";
+
+        if (!string.IsNullOrEmpty(c.SecondaryPhoneNumber) && !phoneRegex.IsMatch(c.SecondaryPhoneNumber))
+            e["ContactInfo.SecondaryPhoneNumber"] = "Must be exactly 10 digits.";
+
+        return e;
+    }
+
+    private Dictionary<string, string> ValidateCurriculum()
+    {
+        var e = new Dictionary<string, string>();
+        if (_selectedGradeIds.Count == 0)
+            e["SupportedGradeIds"] = "Please select at least one grade.";
+        return e;
+    }
+
+    private Dictionary<string, string> ValidatePictures()
+    {
+        var e = new Dictionary<string, string>();
+        if (_dto.Pictures.Count == 0)
+            e["Pictures"] = "At least one picture is required.";
+        else if (_dto.Pictures.Count > 3)
+            e["Pictures"] = "Maximum 3 pictures allowed.";
+        else if (_dto.Pictures.Count(p => p.IsMain) != 1)
+            e["Pictures"] = "Exactly one picture must be set as the main picture.";
+        return e;
+    }
+
+    private bool HasError(string field)   => _stepErrors.ContainsKey(field);
+    private string GetError(string field) => _stepErrors.GetValueOrDefault(field, "");
+
+    private async Task SubmitAsync()
+    {
+        _stepErrors = ValidatePictures();
+        if (_stepErrors.Count > 0) return;
+
+        _submitting = true;
+        var result = await SchoolService.CreateSchool(_dto);
+        _submitting = false;
+
+        var response = ResultHandler.Handle(result, "School created successfully!");
+        if (response is not null)
+            Nav.NavigateTo("/schools");
+    }
+
+    private string StepState(int idx) =>
+        idx < _currentStep  ? "done"   :
+        idx == _currentStep ? "active" : "pending";
+
+    private static string InputCls(bool hasError) =>
+        "w-full px-3.5 py-2 text-[13px] font-[inherit] text-gray-900 bg-gray-50 border rounded-lg outline-none transition-all " +
+        "placeholder:text-gray-300 focus:bg-white focus:shadow-[0_0_0_3px_rgba(17,24,39,0.06)] " +
+        (hasError
+            ? "border-red-300 bg-red-50/30 focus:border-red-400 focus:shadow-[0_0_0_3px_rgba(239,68,68,0.07)]"
+            : "border-gray-200 focus:border-gray-900");
+
+    private static string SelectCls(bool hasError) =>
+        "w-full px-3.5 py-2 text-[13px] font-[inherit] text-gray-900 bg-gray-50 border rounded-lg outline-none transition-all cursor-pointer " +
+        "focus:bg-white focus:shadow-[0_0_0_3px_rgba(17,24,39,0.06)] " +
+        (hasError
+            ? "border-red-300 bg-red-50/30 focus:border-red-400"
+            : "border-gray-200 focus:border-gray-900");
+
+    private RenderFragment ErrorMsg(string field) => b => {
+        if (!HasError(field)) return;
+        b.OpenElement(0, "span");
+        b.AddAttribute(1, "class", "text-[11px] text-red-400 font-medium flex items-center gap-1 mt-0.5");
+        b.OpenElement(2, "i");
+        b.AddAttribute(3, "class", "fa-solid fa-circle-exclamation text-[10px]");
+        b.CloseElement();
+        b.AddContent(4, GetError(field));
+        b.CloseElement();
+    };
+
+    private RenderFragment OptionalBadge => b => {
+        b.OpenElement(0, "span");
+        b.AddAttribute(1, "class", "text-[10px] font-medium text-gray-300 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 ml-0.5");
+        b.AddContent(2, "optional");
+        b.CloseElement();
+    };
 }

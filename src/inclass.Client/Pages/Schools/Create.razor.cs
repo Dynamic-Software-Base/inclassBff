@@ -1,4 +1,4 @@
-﻿using Contract.InClass.Request.School;
+﻿/*using Contract.InClass.Request.School;
 using Contract.InClass.Response.Files;
 using inclass.Client.Services;
 using Microsoft.AspNetCore.Components;
@@ -39,4 +39,4 @@ public partial class Create : ComponentBase
                        ?? ["An unexpected error occurred."];
     }
 
-}
+}*/

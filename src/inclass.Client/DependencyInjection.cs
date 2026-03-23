@@ -20,7 +20,7 @@ public static class DependencyInjection
       
         services.AddScoped<AuthenticationStateProvider, BffAuthStateProvider>();
         services.AddScoped<AuthService>();
-        
+        services.AddScoped<EducationalSystemService>();
         services.AddSingleton<ToastService>();
         services.AddScoped<ApiResultHandler>();
         return services;
