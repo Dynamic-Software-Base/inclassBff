@@ -1,0 +1,206 @@
+﻿@* SectionEditor.razor — right-panel editor for the active section *@
+@using inclass.Client.Services.Settings
+
+@if (Section is not null)
+{
+    <div class="flex flex-col gap-0 rounded-xl border border-zinc-200 overflow-hidden bg-white">
+
+        @* ── Section header ── *@
+        <div class="flex items-center gap-3 px-4 py-3 bg-zinc-50 border-b border-zinc-200">
+            <div class="w-1 h-5 rounded-full bg-indigo-500 shrink-0"></div>
+
+            @* Inline-editable title *@
+            @if (_editingTitle)
+            {
+                <input @ref="_titleRef"
+                    type="text"
+                    @bind="_titleDraft"
+                    @onblur="CommitTitle"
+                    @onkeydown="TitleKey"
+                    class="flex-1 font-mono text-[11px] font-bold uppercase tracking-widest text-zinc-800 bg-white border border-indigo-400 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+            }
+            else
+            {
+                <button @onclick="StartEditTitle"
+                    class="flex-1 text-left font-mono text-[11px] font-bold uppercase tracking-widest text-zinc-700 hover:text-indigo-600 transition-colors truncate"
+                    title="Cliquer pour modifier">
+                    @Section.Title
+                </button>
+            }
+
+            @* key badge *@
+            <code class="text-[10px] font-mono text-zinc-400 bg-zinc-100 border border-zinc-200 px-1.5 py-0.5 rounded shrink-0">
+                @Section.Key
+            </code>
+
+            @* Field count *@
+            <span class="text-[10px] font-mono text-zinc-400 bg-zinc-100 border border-zinc-200 px-1.5 py-0.5 rounded shrink-0">
+                @Section.Fields.Count champ@(Section.Fields.Count != 1 ? "s" : "")
+            </span>
+
+            @* Move up/down *@
+            <div class="flex gap-1 shrink-0">
+                <button @onclick="() => OnMoveUp.InvokeAsync(Section.Key)"
+                    class="w-7 h-7 flex items-center justify-center text-zinc-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-md border border-transparent hover:border-indigo-200 transition-all text-[11px]"
+                    title="Monter">▲</button>
+                <button @onclick="() => OnMoveDown.InvokeAsync(Section.Key)"
+                    class="w-7 h-7 flex items-center justify-center text-zinc-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-md border border-transparent hover:border-indigo-200 transition-all text-[11px]"
+                    title="Descendre">▼</button>
+            </div>
+
+            @* Delete section *@
+            <button @onclick="ConfirmDelete"
+                class="w-7 h-7 flex items-center justify-center text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-md border border-transparent hover:border-red-200 transition-all"
+                title="Supprimer la section">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+            </button>
+        </div>
+
+        @* ── Delete confirmation banner ── *@
+        @if (_confirmDelete)
+        {
+            <div class="flex items-center justify-between px-4 py-2.5 bg-red-50 border-b border-red-200">
+                <span class="text-[12px] text-red-700 font-medium">Supprimer cette section et tous ses champs ?</span>
+                <div class="flex gap-2">
+                    <button @onclick="() => _confirmDelete = false"
+                        class="text-[11px] px-3 py-1 rounded-lg bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors cursor-pointer">
+                        Annuler
+                    </button>
+                    <button @onclick="DoDelete"
+                        class="text-[11px] px-3 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors cursor-pointer font-semibold">
+                        Supprimer
+                    </button>
+                </div>
+            </div>
+        }
+
+        @* ── Field list ── *@
+        <div class="divide-y divide-zinc-100">
+            @if (!Section.Fields.Any())
+            {
+                <div class="py-12 flex flex-col items-center justify-center text-center">
+                    <div class="w-10 h-10 rounded-xl bg-zinc-100 flex items-center justify-center text-xl mb-3">📋</div>
+                    <p class="text-[13px] text-zinc-500">Aucun champ dans cette section</p>
+                    <p class="text-[11px] text-zinc-400 mt-1">Utilisez les boutons ci-dessous pour en ajouter</p>
+                </div>
+            }
+            else
+            {
+                @* TODO: wire SortableJS interop here for field reordering within a section.
+                   1. Give this container a unique ID: id="fields-@Section.Key"
+                   2. In OnAfterRenderAsync, call: await JS.InvokeVoidAsync("initFieldSortable", $"fields-{Section.Key}", DotNetObjectReference.Create(this))
+                   3. Expose [JSInvokable] void OnFieldReordered(string sectionKey, int oldIdx, int newIdx) in a parent component
+                   4. SortableJS config: { animation: 150, handle: '.field-drag-handle', ghostClass: 'sortable-ghost' } *@
+                @foreach (var field in Section.Fields.OrderBy(f => f.SortOrder))
+                {
+                    <FieldRow
+                        Field="field"
+                        OnEditClicked="() => EditField(field)"
+                        OnDeleteClicked="() => DeleteField(field)" />
+                }
+            }
+        </div>
+
+        @* ── Quick-add bar ── *@
+        <div class="px-4 py-3 bg-zinc-50 border-t border-zinc-200 flex flex-wrap items-center gap-2">
+            <span class="text-[11px] text-zinc-400 font-medium mr-1">Ajouter :</span>
+            @foreach (var ft in Enum.GetValues<FieldType>())
+            {
+                <button @onclick="() => QuickAddField(ft)"
+                    class="text-[11px] font-mono px-2.5 py-1 rounded-md border transition-all cursor-pointer hover:shadow-sm @ft.ToBadgeClass() hover:scale-[1.03]">
+                    + @ft.ToLabel()
+                </button>
+            }
+            <button @onclick="() => AddBlankField()"
+                class="ml-auto text-[12px] font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-3 py-1.5 rounded-lg transition-all cursor-pointer">
+                ✦ Champ personnalisé…
+            </button>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public SchemaSection? Section { get; set; }
+    [Parameter] public List<string> AllSectionKeys { get; set; } = new();
+    [Parameter] public EventCallback<SchemaSection> OnChange { get; set; }
+    [Parameter] public EventCallback<string> OnDelete { get; set; }
+    [Parameter] public EventCallback<string> OnMoveUp { get; set; }
+    [Parameter] public EventCallback<string> OnMoveDown { get; set; }
+
+    // These bubble up to SchemaManagementTab which owns the drawer
+    [Parameter] public EventCallback<(SchemaField, SchemaSection)> OnEditField { get; set; }
+
+    private bool _editingTitle = false;
+    private string _titleDraft = "";
+    private bool _confirmDelete = false;
+    private ElementReference _titleRef;
+
+    private void StartEditTitle()
+    {
+        _titleDraft = Section!.Title;
+        _editingTitle = true;
+    }
+
+    private async Task CommitTitle()
+    {
+        if (!string.IsNullOrWhiteSpace(_titleDraft) && Section is not null)
+        {
+            Section.Title = _titleDraft.Trim();
+            await OnChange.InvokeAsync(Section);
+        }
+        _editingTitle = false;
+    }
+
+    private async Task TitleKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await CommitTitle();
+        else if (e.Key == "Escape") _editingTitle = false;
+    }
+
+    private void ConfirmDelete() => _confirmDelete = true;
+
+    private async Task DoDelete()
+    {
+        _confirmDelete = false;
+        await OnDelete.InvokeAsync(Section!.Key);
+    }
+
+    private async Task EditField(SchemaField f)
+        => await OnEditField.InvokeAsync((f, Section!));
+
+    private async Task DeleteField(SchemaField f)
+    {
+        Section!.Fields.Remove(f);
+        await OnChange.InvokeAsync(Section);
+    }
+
+    private async Task QuickAddField(FieldType ft)
+    {
+        if (Section is null) return;
+        var newField = new SchemaField
+        {
+            Key = $"{ft.ToLabel()}_{Section.Fields.Count + 1}",
+            Label = $"Nouveau champ ({ft.ToLabel()})",
+            Type = ft,
+            SortOrder = Section.Fields.Count
+        };
+        // Open the drawer for editing before committing
+        await OnEditField.InvokeAsync((newField, Section));
+    }
+
+    private async Task AddBlankField()
+    {
+        if (Section is null) return;
+        var blank = new SchemaField
+        {
+            Key = $"field_{Section.Fields.Count + 1}",
+            Label = "Nouveau champ",
+            Type = FieldType.Text,
+            SortOrder = Section.Fields.Count
+        };
+        await OnEditField.InvokeAsync((blank, Section));
+    }
+}

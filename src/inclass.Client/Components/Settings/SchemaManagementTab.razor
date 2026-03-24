@@ -1,0 +1,673 @@
+﻿@* SchemaManagementTab.razor — wired to real API *@
+@using inclass.Client.Services.Settings
+@using inclass.Client.Services
+@using inclass.Client.Services.Schema
+@using Contract.InClass.Response.School.EducationalSystem
+@using Contract.InClass.Response.Registration.Schemas
+@using System.Text.Json
+@using inclass.Client.Services.Schools
+@inject SchoolContextService SchoolContext
+@inject SchemaService SchemaService
+@inject EducationalSystemService EducationalSystemService
+@inject ApiResultHandler ResultHandler
+@implements IDisposable
+
+<div class="flex flex-col gap-3">
+
+    @* ── Loading state ── *@
+    @if (_initializing)
+    {
+        <div class="bg-white border border-zinc-200 rounded-xl p-10 flex flex-col items-center justify-center gap-3">
+            <svg class="animate-spin h-6 w-6 text-indigo-500" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4z"/>
+            </svg>
+            <span class="text-[13px] text-zinc-400">Chargement du système scolaire…</span>
+        </div>
+    }
+    @* ── No school selected ── *@
+    else if (SchoolContext.SelectedSchoolId is null)
+    {
+        <div class="bg-white border border-zinc-200 rounded-xl p-10 flex flex-col items-center justify-center text-center gap-2">
+            <div class="text-3xl mb-2">🏫</div>
+            <p class="text-[14px] font-medium text-zinc-600">Aucun établissement sélectionné</p>
+            <p class="text-[12px] text-zinc-400">Sélectionnez un établissement dans la barre supérieure.</p>
+        </div>
+    }
+    @* ── No grades available ── *@
+    else if (!_gradeOptions.Any())
+    {
+        <div class="bg-white border border-zinc-200 rounded-xl p-10 flex flex-col items-center justify-center text-center gap-2">
+            <div class="text-3xl mb-2">📭</div>
+            <p class="text-[14px] font-medium text-zinc-600">Aucun niveau scolaire disponible</p>
+            <p class="text-[12px] text-zinc-400">Ajoutez des niveaux à cet établissement pour gérer les schémas.</p>
+        </div>
+    }
+    else
+    {
+        @* ── Top bar ── *@
+        <div class="bg-white border border-zinc-200 rounded-xl px-5 py-4 shadow-xs">
+            <div class="flex flex-wrap items-end gap-5">
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Niveau scolaire</label>
+                    <div class="relative">
+                        <select @bind="_selectedGradeId" @bind:after="OnGradeChangedAsync"
+                            class="appearance-none bg-zinc-50 border border-zinc-200 text-zinc-800 text-sm font-medium rounded-lg pl-3 pr-9 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all cursor-pointer min-w-64">
+                            @foreach (var g in _gradeOptions)
+                            {
+                                <option value="@g.Id">@g.CycleLabel — @g.GradeLabel</option>
+                            }
+                        </select>
+                        <svg class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400"
+                            fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-3 flex-wrap pb-0.5">
+                    @if (_schemaLoading)
+                    {
+                        <div class="h-5 w-32 bg-zinc-100 animate-pulse rounded"></div>
+                    }
+                    else if (_currentSchema is not null)
+                    {
+                        <span class="text-[11px] text-zinc-400">Code :</span>
+                        <code class="text-[11px] font-mono text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
+                            @_currentSchema.SchemaCode
+                        </code>
+                        @if (_currentSchema.IsCustomized)
+                        {
+                            <span class="text-[10px] font-bold font-mono uppercase tracking-wider px-2 py-0.5 rounded border bg-amber-50 text-amber-600 border-amber-200">
+                                ✦ Personnalisé
+                            </span>
+                            <button @onclick="ResetToDefaultAsync"
+                                class="text-[11px] text-red-500 hover:text-red-700 underline underline-offset-2 transition-colors">
+                                ↺ Réinitialiser
+                            </button>
+                        }
+                        else
+                        {
+                            <span class="text-[10px] font-bold font-mono uppercase tracking-wider px-2 py-0.5 rounded border bg-zinc-100 text-zinc-400 border-zinc-200">
+                                Défaut
+                            </span>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        @* ── Meta bar ── *@
+        @if (!_schemaLoading && _currentSchema is not null)
+        {
+            <div class="bg-white border border-zinc-200 rounded-xl px-5 py-3 shadow-xs flex flex-wrap items-center gap-4">
+                <div class="flex items-center gap-3 flex-1">
+                    <input type="text" @bind="_schemaTitle"
+                        @oninput="e => { _schemaTitle = e.Value?.ToString() ?? _schemaTitle; MarkDirty(); }"
+                        class="text-[15px] font-semibold text-zinc-900 bg-transparent border border-transparent rounded-lg px-2 py-1 focus:outline-none focus:border-indigo-400 focus:bg-zinc-50 transition-all min-w-64 placeholder-zinc-300"
+                        placeholder="Titre du schéma…" />
+                    <span class="font-mono text-[10px] px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-500 border border-indigo-100 shrink-0">
+                        v@_currentSchema.Version
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="font-mono text-[11px] text-zinc-400 bg-zinc-50 border border-zinc-200 px-2.5 py-1 rounded-md">
+                        @_sections.Count section(s)
+                    </span>
+                    <span class="font-mono text-[11px] text-zinc-400 bg-zinc-50 border border-zinc-200 px-2.5 py-1 rounded-md">
+                        @_sections.Sum(s => s.Fields.Count) champ(s)
+                    </span>
+                </div>
+            </div>
+        }
+
+        @* ── Toolbar ── *@
+        <div class="bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-2.5 flex flex-wrap items-center gap-3 shadow-xs">
+            @if (_dirty)
+            {
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0"></span>
+                    <span class="text-[12px] text-amber-600 font-medium">Modifications non enregistrées</span>
+                </div>
+            }
+            <div class="flex items-center gap-2 ml-auto">
+                <button @onclick="Discard" disabled="@(!_dirty)"
+                    class="@(!_dirty ? "opacity-40 cursor-not-allowed" : "hover:bg-zinc-200 cursor-pointer") text-[13px] font-medium text-zinc-600 bg-white border border-zinc-300 px-4 py-1.5 rounded-lg transition-all">
+                    Annuler
+                </button>
+                <button @onclick="SaveAsync" disabled="@(!_dirty || _saving)"
+                    class="@(!_dirty || _saving ? "opacity-50 cursor-not-allowed" : "hover:bg-indigo-700 cursor-pointer shadow-sm") text-[13px] font-semibold text-white bg-indigo-600 px-5 py-1.5 rounded-lg transition-all flex items-center gap-2">
+                    @if (_saving)
+                    {
+                        <svg class="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4z"/>
+                        </svg>
+                        <span>Enregistrement…</span>
+                    }
+                    else { <span>💾 Enregistrer</span> }
+                </button>
+            </div>
+        </div>
+
+        @* ── Toast ── *@
+        @if (_toast is not null)
+        {
+            <div class="@(_toastType == "success" ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-red-50 border-red-200 text-red-700") border rounded-xl px-4 py-2.5 text-[13px] font-semibold flex items-center gap-2">
+                @(_toastType == "success" ? "✓" : "✕") @_toast
+            </div>
+        }
+
+        @* ── Schema loading skeleton ── *@
+        @if (_schemaLoading)
+        {
+            <div class="border border-zinc-200 rounded-xl overflow-hidden min-h-96 flex items-center justify-center bg-white">
+                <div class="flex flex-col items-center gap-3">
+                    <svg class="animate-spin h-5 w-5 text-indigo-400" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4z"/>
+                    </svg>
+                    <span class="text-[12px] text-zinc-400">Chargement du schéma…</span>
+                </div>
+            </div>
+        }
+        @* ── Schema not found ── *@
+        else if (_schemaNotFound)
+        {
+            <div class="border border-zinc-200 rounded-xl overflow-hidden min-h-64 flex flex-col items-center justify-center bg-white gap-3 text-center py-16">
+                <div class="w-12 h-12 rounded-2xl bg-zinc-100 flex items-center justify-center text-2xl">📋</div>
+                <p class="text-[14px] font-medium text-zinc-600">Aucun schéma trouvé pour ce niveau</p>
+                <p class="text-[12px] text-zinc-400 max-w-xs">Ce niveau n'a pas encore de schéma d'inscription configuré.</p>
+            </div>
+        }
+        @* ── Main editor ── *@
+        else if (_currentSchema is not null)
+        {
+            <div class="flex border border-zinc-200 rounded-xl overflow-hidden shadow-xs min-h-[540px]">
+
+                @* LEFT: Sections sidebar *@
+                <div class="w-56 shrink-0 border-r border-zinc-200 bg-zinc-50 flex flex-col overflow-y-auto">
+                    <div class="flex justify-between items-center px-3 py-2.5 border-b border-zinc-200 bg-white sticky top-0 z-10">
+                        <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Sections</span>
+                        <span class="text-[10px] font-mono text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded">@_sections.Count</span>
+                    </div>
+
+                    @foreach (var sec in _sections.OrderBy(s => s.SortOrder))
+                    {
+                        <div @onclick="() => SelectSection(sec.Key)"
+                            class="@(_activeSec == sec.Key
+                                ? "bg-white border-l-2 border-indigo-500"
+                                : "border-l-2 border-transparent hover:bg-zinc-100")
+                                flex items-center gap-2 px-2.5 py-2.5 cursor-pointer border-b border-zinc-100 transition-all group/sec">
+                            <span class="section-grip text-zinc-300 group-hover/sec:text-zinc-400 text-[11px] shrink-0 cursor-grab select-none transition-colors">⠿</span>
+                            <span class="@(_activeSec == sec.Key ? "text-zinc-900" : "text-zinc-600") flex-1 text-[13px] font-medium truncate leading-snug">
+                                @sec.Title
+                            </span>
+                            <span class="text-[10px] font-mono text-zinc-400 bg-zinc-100 border border-zinc-200 px-1.5 py-px rounded shrink-0">
+                                @sec.Fields.Count
+                            </span>
+                            <div class="flex flex-col gap-px shrink-0" @onclick:stopPropagation="true">
+                                <button @onclick="() => MoveSection(sec.Key, -1)"
+                                    class="text-[8px] w-3.5 h-3.5 flex items-center justify-center text-zinc-300 hover:text-indigo-500 transition-colors">▲</button>
+                                <button @onclick="() => MoveSection(sec.Key, 1)"
+                                    class="text-[8px] w-3.5 h-3.5 flex items-center justify-center text-zinc-300 hover:text-indigo-500 transition-colors">▼</button>
+                            </div>
+                        </div>
+                    }
+
+                    @if (_newSectionVisible)
+                    {
+                        <div class="px-3 py-3 border-t border-zinc-200 flex flex-col gap-2 bg-white">
+                            <input type="text" @bind="_newSectionTitle" @onkeydown="NewSectionKey"
+                                placeholder="Titre de la section…"
+                                class="w-full text-[13px] bg-zinc-50 border border-zinc-300 text-zinc-800 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-zinc-300 transition-all" />
+                            <div class="flex gap-1.5">
+                                <button @onclick="AddSection"
+                                    class="flex-1 text-[12px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition-colors cursor-pointer">
+                                    Ajouter
+                                </button>
+                                <button @onclick='() => { _newSectionVisible = false; _newSectionTitle = ""; }'
+                                    class="text-[12px] text-zinc-500 hover:text-zinc-700 bg-zinc-100 hover:bg-zinc-200 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer">
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="mt-auto border-t border-zinc-200 p-2.5">
+                        <button @onclick="() => _newSectionVisible = true"
+                            class="w-full text-[12px] font-medium text-zinc-500 hover:text-indigo-600 bg-white hover:bg-indigo-50 border border-zinc-200 hover:border-indigo-300 py-2 rounded-lg transition-all cursor-pointer">
+                            + Ajouter une section
+                        </button>
+                    </div>
+                </div>
+
+                @* RIGHT: Active section editor *@
+                <div class="flex-1 overflow-y-auto bg-white p-5">
+                    @{
+                        var activeSec = _sections.FirstOrDefault(s => s.Key == _activeSec);
+                    }
+                    @if (activeSec is null)
+                    {
+                        <div class="h-full flex flex-col items-center justify-center text-center py-20">
+                            <div class="w-14 h-14 rounded-2xl bg-zinc-100 flex items-center justify-center text-2xl mb-4">🗂️</div>
+                            <p class="text-sm font-medium text-zinc-500">Sélectionnez une section à gauche</p>
+                            <p class="text-xs text-zinc-400 mt-1">pour voir et modifier ses champs</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <SectionEditor
+                            Section="activeSec"
+                            AllSectionKeys="GetAllSectionKeys()"
+                            OnChange="HandleSectionChange"
+                            OnDelete="HandleDeleteSection"
+                            OnMoveUp="key => MoveSection(key, -1)"
+                            OnMoveDown="key => MoveSection(key, 1)"
+                            OnEditField="HandleEditFieldRequest" />
+                    }
+                </div>
+            </div>
+        }
+
+        @* ── Field Editor Drawer ── *@
+        <FieldEditorDrawer
+            IsOpen="_isDrawerOpen"
+            EditingField="_editingField"
+            AllFieldKeys="GetAllFieldKeys()"
+            OnSave="HandleFieldSave"
+            OnCancel="CloseDrawer" />
+    }
+</div>
+
+@code {
+    // ── Grade option model ──────────────────────────────────────────────────
+    private record GradeOption(Guid Id, string CycleLabel, string GradeLabel);
+
+    // ── State ───────────────────────────────────────────────────────────────
+    private bool _initializing = true;
+    private bool _schemaLoading = false;
+    private bool _schemaNotFound = false;
+
+    private List<GradeOption> _gradeOptions = new();
+    private Guid _selectedGradeId;
+
+    private FormSchemaResponse? _currentSchema;
+    private string _schemaTitle = "";
+
+    private List<SchemaSection> _sections = new();
+    private List<SchemaSection> _original = new();
+    private string? _activeSec;
+
+    private bool _dirty = false;
+    private bool _saving = false;
+
+    private bool _newSectionVisible = false;
+    private string _newSectionTitle = "";
+
+    private bool _isDrawerOpen = false;
+    private SchemaField? _editingField;
+    private SchemaSection? _editingFieldSection;
+
+    private string? _toast;
+    private string _toastType = "success";
+    private System.Timers.Timer? _toastTimer;
+
+    // ── Lifecycle ───────────────────────────────────────────────────────────
+    protected override async Task OnInitializedAsync()
+    {
+        SchoolContext.OnChanged += OnSchoolChanged;
+        await LoadGradesAsync();
+        _initializing = false;
+
+        if (_gradeOptions.Any())
+            await LoadSchemaAsync();
+    }
+
+    private async void OnSchoolChanged()
+    {
+        // School switched — reload grades and schema
+        _initializing = true;
+        _currentSchema = null;
+        _sections = new();
+        _dirty = false;
+        await InvokeAsync(StateHasChanged);
+
+        await LoadGradesAsync();
+        _initializing = false;
+
+        if (_gradeOptions.Any())
+            await LoadSchemaAsync();
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // ── Data loading ────────────────────────────────────────────────────────
+    private async Task LoadGradesAsync()
+    {
+        _gradeOptions = new();
+        var response = await EducationalSystemService.GetDefaultAsync();
+        var system = ResultHandler.Handle(response);
+        if (system is null) return;
+
+        // Flatten all cycles → grades into GradeOption list
+        // TODO: once SchoolSummaryDto is available in context, filter by GradeLevelOffering flags
+        foreach (var cycle in system.Cycles.OrderBy(c => c.SortOrder))
+        {
+            foreach (var grade in cycle.Grades.OrderBy(g => g.SortOrder))
+            {
+                _gradeOptions.Add(new GradeOption(grade.Id, cycle.Name_Fr, grade.Name_Fr));
+            }
+        }
+
+        // Restore or default selected grade
+        if (_gradeOptions.Any())
+        {
+            var existing = _gradeOptions.FirstOrDefault(g => g.Id == _selectedGradeId);
+            _selectedGradeId = existing?.Id ?? _gradeOptions.First().Id;
+        }
+    }
+
+    private async Task LoadSchemaAsync()
+    {
+        if (SchoolContext.SelectedSchoolId is null || _selectedGradeId == Guid.Empty) return;
+
+        _schemaLoading = true;
+        _schemaNotFound = false;
+        _currentSchema = null;
+        _sections = new();
+        StateHasChanged();
+
+        var response = await SchemaService.GetSchemaAsync(
+            SchoolContext.SelectedSchoolId.Value,
+            _selectedGradeId);
+
+        _schemaLoading = false;
+
+        if (!response.IsSuccess)
+        {
+            // 404 is expected when no schema exists yet for this grade
+            var isNotFound = response.Errors?.Any(e => e.Code == "FormSchema.NotFound") == true;
+            _schemaNotFound = isNotFound;
+            if (!isNotFound) ResultHandler.Handle(response); // show toast for real errors
+            return;
+        }
+
+        _currentSchema = response.Data;
+        if (_currentSchema is null) return;
+
+        _schemaTitle = _currentSchema.Title;
+        _sections = MapFromResponse(_currentSchema);
+        _original = DeepClone(_sections);
+        _activeSec = _sections.FirstOrDefault()?.Key;
+        _dirty = false;
+    }
+
+    // ── Grade selector ──────────────────────────────────────────────────────
+    private async Task OnGradeChangedAsync()
+    {
+        _dirty = false;
+        await LoadSchemaAsync();
+    }
+
+    // ── Section operations ──────────────────────────────────────────────────
+    private void SelectSection(string key) { _activeSec = key; _newSectionVisible = false; }
+
+    private void HandleSectionChange(SchemaSection updated)
+    {
+        var i = _sections.FindIndex(s => s.Key == updated.Key);
+        if (i >= 0) _sections[i] = updated;
+        MarkDirty();
+    }
+
+    private void HandleDeleteSection(string key)
+    {
+        _sections.RemoveAll(s => s.Key == key);
+        Reindex();
+        if (_activeSec == key) _activeSec = _sections.FirstOrDefault()?.Key;
+        MarkDirty();
+    }
+
+    private void MoveSection(string key, int dir)
+    {
+        var list = _sections.OrderBy(s => s.SortOrder).ToList();
+        var i = list.FindIndex(s => s.Key == key);
+        var ni = i + dir;
+        if (ni < 0 || ni >= list.Count) return;
+        (list[i].SortOrder, list[ni].SortOrder) = (list[ni].SortOrder, list[i].SortOrder);
+        Reindex();
+        MarkDirty();
+    }
+
+    private void AddSection()
+    {
+        if (string.IsNullOrWhiteSpace(_newSectionTitle)) return;
+        var ns = new SchemaSection
+        {
+            Key = $"sec_{Guid.NewGuid().ToString("N")[..8]}",
+            Title = _newSectionTitle.Trim(),
+            IsExpanded = true,
+            SortOrder = _sections.Count + 1
+        };
+        _sections.Add(ns);
+        _activeSec = ns.Key;
+        _newSectionTitle = "";
+        _newSectionVisible = false;
+        MarkDirty();
+    }
+
+    private void NewSectionKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") AddSection();
+        if (e.Key == "Escape") { _newSectionVisible = false; _newSectionTitle = ""; }
+    }
+
+    private void Reindex()
+    {
+        var ordered = _sections.OrderBy(s => s.SortOrder).ToList();
+        for (int i = 0; i < ordered.Count; i++) ordered[i].SortOrder = i + 1;
+    }
+
+    // ── Field drawer ────────────────────────────────────────────────────────
+    private void HandleEditFieldRequest((SchemaField field, SchemaSection section) args)
+    {
+        _editingField = args.field;
+        _editingFieldSection = args.section;
+        _isDrawerOpen = true;
+    }
+
+    private void HandleFieldSave(SchemaField updated)
+    {
+        if (_editingFieldSection is null) { CloseDrawer(); return; }
+        var existing = _editingFieldSection.Fields.FirstOrDefault(f => f.Key == updated.Key);
+        if (existing is not null)
+        {
+            existing.Label = updated.Label; existing.Type = updated.Type;
+            existing.IsRequired = updated.IsRequired; existing.Placeholder = updated.Placeholder;
+            existing.Hint = updated.Hint; existing.SortOrder = updated.SortOrder;
+            existing.Options = updated.Options; existing.Condition = updated.Condition;
+        }
+        else { _editingFieldSection.Fields.Add(updated); }
+        MarkDirty();
+        CloseDrawer();
+    }
+
+    private void CloseDrawer() { _isDrawerOpen = false; _editingField = null; _editingFieldSection = null; }
+
+    // ── Save / Discard / Reset ───────────────────────────────────────────────
+    private async Task SaveAsync()
+    {
+        if (SchoolContext.SelectedSchoolId is null) return;
+        _saving = true;
+        StateHasChanged();
+
+        var payload = BuildSchemaJson();
+        var response = await SchemaService.SaveSchemaAsync(
+            SchoolContext.SelectedSchoolId.Value,
+            _selectedGradeId,
+            payload);
+
+        _saving = false;
+
+        if (!response.IsSuccess)
+        {
+            ResultHandler.Handle(response);
+            return;
+        }
+
+        // Reload to get updated version + IsCustomized from server
+        await LoadSchemaAsync();
+        ShowToast("✓ Schéma enregistré avec succès", "success");
+    }
+
+    private void Discard()
+    {
+        _sections = DeepClone(_original);
+        _schemaTitle = _currentSchema?.Title ?? "";
+        _dirty = false;
+    }
+
+    private async Task ResetToDefaultAsync()
+    {
+        // Resetting = saving the default (SchoolId null on server means default)
+        // For now just reload — the server already has the default, we just discard local changes
+        _dirty = false;
+        await LoadSchemaAsync();
+        ShowToast("↺ Schéma réinitialisé au fichier par défaut", "success");
+    }
+
+    private void MarkDirty() => _dirty = true;
+
+    // ── JSON serialization ──────────────────────────────────────────────────
+    private string BuildSchemaJson()
+    {
+        // Reconstruct the JSON structure the server expects:
+        // { title, schemaCode, sections: [ { key, title, sortOrder, displayCondition, fields: [...] } ] }
+        var obj = new
+        {
+            title = _schemaTitle,
+            schemaCode = _currentSchema?.SchemaCode ?? "",
+            sections = _sections.OrderBy(s => s.SortOrder).Select(s => new
+            {
+                key = s.Key,
+                title = s.Title,
+                sortOrder = s.SortOrder,
+                displayCondition = (object?)null, // section-level condition not yet in UI
+                fields = s.Fields.OrderBy(f => f.SortOrder).Select(f => new
+                {
+                    key = f.Key,
+                    label = f.Label,
+                    fieldType = f.Type.ToLabel(),
+                    isRequired = f.IsRequired,
+                    sortOrder = f.SortOrder,
+                    placeholder = string.IsNullOrEmpty(f.Placeholder) ? null : f.Placeholder,
+                    hint = string.IsNullOrEmpty(f.Hint) ? null : f.Hint,
+                    options = f.Options.Any()
+                        ? f.Options.Select(o => new { value = o.Value, label = o.Label }).ToList()
+                        : null,
+                    displayCondition = f.Condition?.IsEnabled == true
+                        ? new { field = f.Condition.FieldKey, @operator = f.Condition.Operator, value = f.Condition.Value }
+                        : null
+                }).ToList()
+            }).ToList()
+        };
+
+        return JsonSerializer.Serialize(obj, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+        });
+    }
+
+    // ── Response → UI model mapping ─────────────────────────────────────────
+    private static List<SchemaSection> MapFromResponse(FormSchemaResponse schema)
+    {
+        if (schema.Sections is null) return new();
+
+        return schema.Sections.OrderBy(s => s.SortOrder).Select(s => new SchemaSection
+        {
+            Key = s.Key,
+            Title = s.Title,
+            IsExpanded = true,
+            SortOrder = s.SortOrder,
+            Fields = s.Fields is null ? new() : s.Fields.OrderBy(f => f.SortOrder).Select(f => new SchemaField
+            {
+                Key = f.Key,
+                Label = f.Label,
+                Type = ParseFieldType(f.FieldType),
+                IsRequired = f.IsRequired,
+                SortOrder = f.SortOrder,
+                Placeholder = f.Placeholder ?? "",
+                Hint = f.Hont ?? "",
+                Options = f.Options is null ? new() : f.Options.Select(o => new SelectOption
+                {
+                    Value = o.Value,
+                    Label = o.Label
+                }).ToList(),
+                Condition = f.DisplayCondition is null ? null : new DisplayCondition
+                {
+                    IsEnabled = true,
+                    FieldKey = f.DisplayCondition.Field,
+                    Operator = f.DisplayCondition.Operator,
+                    Value = f.DisplayCondition.Value
+                }
+            }).ToList()
+        }).ToList();
+    }
+
+    private static FieldType ParseFieldType(string raw) => raw.ToLowerInvariant() switch
+    {
+        "text"     => FieldType.Text,
+        "textarea" => FieldType.Textarea,
+        "number"   => FieldType.Number,
+        "date"     => FieldType.Date,
+        "boolean"  => FieldType.Boolean,
+        "select"   => FieldType.Select,
+        _          => FieldType.Text
+    };
+
+    // ── Helpers ─────────────────────────────────────────────────────────────
+    private List<string> GetAllFieldKeys() =>
+        _sections.SelectMany(s => s.Fields).Select(f => f.Key).ToList();
+
+    private List<string> GetAllSectionKeys() =>
+        _sections.Select(s => s.Key).ToList();
+
+    private void ShowToast(string msg, string type)
+    {
+        _toast = msg; _toastType = type;
+        _toastTimer?.Dispose();
+        _toastTimer = new System.Timers.Timer(3200);
+        _toastTimer.Elapsed += (_, _) =>
+        {
+            _toast = null;
+            InvokeAsync(StateHasChanged);
+            _toastTimer?.Dispose();
+        };
+        _toastTimer.Start();
+        StateHasChanged();
+    }
+
+    private static List<SchemaSection> DeepClone(List<SchemaSection> src) =>
+        src.Select(s => new SchemaSection
+        {
+            Key = s.Key, Title = s.Title, IsExpanded = s.IsExpanded, SortOrder = s.SortOrder,
+            Fields = s.Fields.Select(f => new SchemaField
+            {
+                Key = f.Key, Label = f.Label, Type = f.Type, IsRequired = f.IsRequired,
+                Placeholder = f.Placeholder, Hint = f.Hint, SortOrder = f.SortOrder,
+                Options = f.Options.Select(o => new SelectOption { Value = o.Value, Label = o.Label }).ToList(),
+                Condition = f.Condition is null ? null : new DisplayCondition
+                {
+                    IsEnabled = f.Condition.IsEnabled, FieldKey = f.Condition.FieldKey,
+                    Operator = f.Condition.Operator, Value = f.Condition.Value
+                }
+            }).ToList()
+        }).ToList();
+
+    public void Dispose()
+    {
+        SchoolContext.OnChanged -= OnSchoolChanged;
+        _toastTimer?.Dispose();
+    }
+}

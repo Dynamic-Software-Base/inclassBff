@@ -32,4 +32,8 @@ public class SchoolService
     {
         return await _client.GetAsync<List<SchoolSummaryDto>>("/api/schools/my-schools");
     }
+    public async Task<ApiResponse<List<SchoolSwitcherDto>>> GetSwitcherSchools()
+    {
+        return await _client.GetAsync<List<SchoolSwitcherDto>>("/api/schools/globalSchoolInfo");
+    }
 }
