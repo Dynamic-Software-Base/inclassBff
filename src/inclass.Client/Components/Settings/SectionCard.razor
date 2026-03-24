@@ -1,0 +1,152 @@
+﻿@using inclass.Client.Services.Settings
+@* SectionCard.razor *@
+
+<div class="bg-white rounded-xl border @(IsDragging ? "border-indigo-300 shadow-lg ring-2 ring-indigo-100" : "border-slate-200 shadow-sm") transition-all duration-200 overflow-hidden">
+
+    <!-- Section Header -->
+    <div class="flex items-center gap-3 px-4 py-3 bg-slate-50 border-b border-slate-200 group">
+
+        <!-- Drag Handle -->
+        <div class="text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing select-none flex-shrink-0"
+             title="Glisser pour réordonner les sections">
+            <!-- TODO: wire SortableJS interop here.
+                 Create a SortableJS instance on the section list container in SchemaManagementTab.
+                 Use `handle: '.section-drag-handle'` to restrict dragging to this icon.
+                 On `onEnd`, invoke a JS interop method that passes the old/new index back to Blazor.
+                 Use DotNetObjectReference.Create(this) to hold a reference to the parent component. -->
+            <svg class="section-drag-handle w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M7 2a1 1 0 000 2 1 1 0 000-2zm6 0a1 1 0 000 2 1 1 0 000-2zM7 7a1 1 0 000 2 1 1 0 000-2zm6 0a1 1 0 000 2 1 1 0 000-2zM7 12a1 1 0 000 2 1 1 0 000-2zm6 0a1 1 0 000 2 1 1 0 000-2z"/>
+            </svg>
+        </div>
+
+        <!-- Section Title (inline editable) -->
+        @if (_isEditingTitle)
+        {
+            <input
+                @ref="_titleInput"
+                type="text"
+                @bind="_editedTitle"
+                @onblur="CommitTitleEdit"
+                @onkeydown="HandleTitleKeyDown"
+                class="flex-1 text-sm font-semibold text-slate-800 bg-white border border-indigo-400 rounded-md px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        }
+        else
+        {
+            <button
+                @onclick="StartTitleEdit"
+                class="flex-1 text-left text-sm font-semibold text-slate-800 hover:text-indigo-700 transition-colors truncate"
+                title="Cliquer pour modifier le titre">
+                @Section.Title
+                <span class="ml-1 text-xs text-slate-400 font-mono font-normal">(@Section.Key)</span>
+            </button>
+        }
+
+        <!-- Field count badge -->
+        <span class="shrink-0 text-xs text-slate-400 bg-slate-200 px-2 py-0.5 rounded-full">
+            @Section.Fields.Count champ@(Section.Fields.Count > 1 ? "s" : "")
+        </span>
+
+        <!-- Delete section -->
+        <button
+            @onclick="OnDeleteSection"
+            class="shrink-0 p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-md opacity-0 group-hover:opacity-100 transition-all"
+            title="Supprimer la section">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+        </button>
+
+        <!-- Collapse toggle -->
+        <button
+            @onclick="ToggleExpand"
+            class="shrink-0 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-md transition-colors"
+            title="@(Section.IsExpanded ? "Réduire" : "Développer")">
+            <svg class="w-4 h-4 transition-transform duration-200 @(Section.IsExpanded ? "rotate-0" : "-rotate-90")"
+                 fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+            </svg>
+        </button>
+    </div>
+
+    <!-- Section Body (fields) -->
+    @if (Section.IsExpanded)
+    {
+        <div class="divide-y divide-slate-100">
+            @if (Section.Fields.Any())
+            {
+                <!-- TODO: wire SortableJS interop here for field reordering.
+                     Attach a separate SortableJS instance per section's field list.
+                     Use a unique ID per section container, e.g. `id="fields-@Section.Key"`.
+                     On sort end, pass [section.Key, newFieldOrder[]] to a JS interop method
+                     that calls back into Blazor to update the field list for that specific section. -->
+                @foreach (var field in Section.Fields.OrderBy(f => f.SortOrder))
+                {
+                    <div class="px-2">
+                        <FieldRow
+                            Field="field"
+                            OnEditClicked="() => OnEditField(field)"
+                            OnDeleteClicked="() => OnDeleteFieldHandler(field)"
+                            OnRequiredToggled="(v) => { field.IsRequired = v; }" />
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="py-6 text-center text-sm text-slate-400 italic">
+                    Aucun champ dans cette section. Ajoutez-en un.
+                </div>
+            }
+        </div>
+
+        <!-- Add Field button -->
+        <div class="px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+            <button
+                @onclick="OnAddFieldHandler"
+                class="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium transition-colors group/add">
+                <span class="w-5 h-5 rounded-full bg-indigo-100 group-hover/add:bg-indigo-200 flex items-center justify-center text-base leading-none transition-colors">+</span>
+                Ajouter un champ
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SchemaSection Section { get; set; } = default!;
+    [Parameter] public bool IsDragging { get; set; } = false;
+    [Parameter] public EventCallback OnDeleteSectionClicked { get; set; }
+    [Parameter] public EventCallback<SchemaField> OnEditFieldClicked { get; set; }
+    [Parameter] public EventCallback<SchemaField> OnDeleteFieldClicked { get; set; }
+    [Parameter] public EventCallback OnAddFieldClicked { get; set; }
+
+    private bool _isEditingTitle = false;
+    private string _editedTitle = "";
+    private ElementReference _titleInput;
+
+    private void ToggleExpand() => Section.IsExpanded = !Section.IsExpanded;
+
+    private void StartTitleEdit()
+    {
+        _editedTitle = Section.Title;
+        _isEditingTitle = true;
+        // Focus is tricky in Blazor without JS interop for immediate focus,
+        // but the input will render and the user can start typing.
+    }
+
+    private void CommitTitleEdit()
+    {
+        if (!string.IsNullOrWhiteSpace(_editedTitle))
+            Section.Title = _editedTitle.Trim();
+        _isEditingTitle = false;
+    }
+
+    private void HandleTitleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") CommitTitleEdit();
+        else if (e.Key == "Escape") _isEditingTitle = false;
+    }
+
+    private async Task OnDeleteSection() => await OnDeleteSectionClicked.InvokeAsync();
+    private async Task OnEditField(SchemaField f) => await OnEditFieldClicked.InvokeAsync(f);
+    private async Task OnDeleteFieldHandler(SchemaField f) => await OnDeleteFieldClicked.InvokeAsync(f);
+    private async Task OnAddFieldHandler() => await OnAddFieldClicked.InvokeAsync();
+}

@@ -1,0 +1,62 @@
+﻿@* FieldRow.razor — compact field row used inside SectionEditor *@
+@using inclass.Client.Services.Settings
+
+<div class="flex items-center gap-3 px-4 py-2.5 bg-white hover:bg-zinc-50/80 transition-colors group">
+
+    @* Drag grip *@
+    <span class="field-drag-handle text-zinc-200 group-hover:text-zinc-400 cursor-grab select-none text-[13px] shrink-0 transition-colors"
+        title="TODO: wire SortableJS — see SectionEditor.razor">⠿</span>
+
+    @* Label + key *@
+    <div class="flex-1 min-w-0">
+        <span class="text-[13px] font-medium text-zinc-800 truncate block leading-tight">@Field.Label</span>
+        <span class="text-[10px] font-mono text-zinc-400 leading-tight">@Field.Key</span>
+    </div>
+
+    @* Type badge *@
+    <span class="font-mono text-[10px] px-2 py-0.5 rounded border shrink-0 @Field.Type.ToBadgeClass()">
+        @Field.Type.ToLabel()
+    </span>
+
+    @* Required badge *@
+    @if (Field.IsRequired)
+    {
+        <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded border bg-red-50 text-red-500 border-red-200 shrink-0">req</span>
+    }
+    else
+    {
+        <span class="text-[10px] text-zinc-300 shrink-0">opt</span>
+    }
+
+    @* Condition indicator *@
+    @if (Field.Condition?.IsEnabled == true)
+    {
+        <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded border bg-amber-50 text-amber-500 border-amber-200 shrink-0"
+            title="Condition d'affichage active">cond</span>
+    }
+
+    @* Actions *@
+    <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button @onclick="() => OnEditClicked.InvokeAsync()"
+            class="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-indigo-600 hover:bg-indigo-50 rounded border border-transparent hover:border-indigo-200 transition-all"
+            title="Modifier">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+        </button>
+        <button @onclick="() => OnDeleteClicked.InvokeAsync()"
+            class="w-6 h-6 flex items-center justify-center text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded border border-transparent hover:border-red-200 transition-all"
+            title="Supprimer">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+        </button>
+    </div>
+
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SchemaField Field { get; set; } = default!;
+    [Parameter] public EventCallback OnEditClicked { get; set; }
+    [Parameter] public EventCallback OnDeleteClicked { get; set; }
+}

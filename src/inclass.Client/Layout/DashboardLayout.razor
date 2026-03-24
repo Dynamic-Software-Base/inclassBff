@@ -2,6 +2,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using System.Security.Claims
 @using inclass.Client.Components.Reuse
+@using inclass.Client.Components.School
 @inject NavigationManager NavigationManager
 
 <div class="dashboard-shell @(IsSidebarCollapsed ? "sidebar-collapsed" : "") @(IsMobileMenuOpen ? "mobile-open" : "")">
@@ -55,7 +56,7 @@
                 <span class="nav-label">Reports</span>
             </NavLink>
 
-            <NavLink href="/dashboard/settings" class="nav-item" ActiveClass="nav-item--active">
+            <NavLink href="/settings" class="nav-item" ActiveClass="nav-item--active">
                 <i class="fa-solid fa-gear nav-icon"></i>
                 <span class="nav-label">Settings</span>
             </NavLink>
@@ -93,7 +94,7 @@
                 <i class="fa-solid fa-magnifying-glass search-icon"></i>
                 <input type="text" placeholder="Quick search..." class="search-input" />
             </div>
-
+            <SchoolSwitcher />
             <!-- Right actions -->
             <div class="topbar-actions">
                 <!-- Notifications -->

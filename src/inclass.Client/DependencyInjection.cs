@@ -1,6 +1,8 @@
 ﻿using inclass.Client.Auth;
 using inclass.Client.Services;
 using inclass.Client.Services.Api;
+using inclass.Client.Services.Schema;
+using inclass.Client.Services.Schools;
 using Microsoft.AspNetCore.Components.Authorization;
 
 namespace inclass.Client;
@@ -17,7 +19,8 @@ public static class DependencyInjection
         services.AddScoped<ApiClient>();
         services.AddScoped<SchoolService>();
         services.AddScoped<FileService>();
-      
+        services.AddSingleton<SchoolContextService>();
+        services.AddScoped<SchemaService>();
         services.AddScoped<AuthenticationStateProvider, BffAuthStateProvider>();
         services.AddScoped<AuthService>();
         services.AddScoped<EducationalSystemService>();
