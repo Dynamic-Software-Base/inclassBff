@@ -89,20 +89,29 @@
 
         <!-- Desktop auth buttons -->
         <div class="hidden lg:flex items-center gap-4">
-            <button @onclick="SignIn" class="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold bg-indigo-600 text-white">Log in</button>
+            @if (authonticated)
+            {
+                <button @onclick="SignIn" class="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold bg-indigo-600 text-white">Dashboard</button>
+            }
+            else
+            {
+                <button @onclick="SignIn" class="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold bg-indigo-600 text-white">Log in</button>
+            }
+            
         </div>
     </header>
 </Container>
 
 @code {
-
+    bool authonticated;
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        if (authState.User.Identity?.IsAuthenticated == true)
+        authonticated = authState.User.Identity!.IsAuthenticated ? true : false;
+        /*if (authState.User.Identity?.IsAuthenticated == true)
         {
             Navigation.NavigateTo("/dashboard");
-        }
+        }*/
     }
 
 
@@ -163,6 +172,15 @@
 
     private void SignIn()
     {
-        Navigation.NavigateTo("/auth/login",forceLoad:true);
+        if (authonticated)
+        {
+            Navigation.NavigateTo("/dashboard",forceLoad:true);
+        }
+
+        else
+        {
+            Navigation.NavigateTo("/auth/login",forceLoad:true);
+        }
+       
     }
 }
