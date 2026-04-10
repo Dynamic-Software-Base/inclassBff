@@ -1,0 +1,155 @@
+﻿@using System.Threading.Tasks
+@using System.Net.Http
+@using System.Net.Http.Json
+@using Contract.InClass.Response.Registration
+@using inclass.Client.Services
+@using inclass.Client.Services.Registration
+@inject EnrollmentService EnrollmentService
+@inject ApiResultHandler ResultHandler
+
+<div class="space-y-6">
+    <div>
+        <h3 class="text-lg font-bold text-slate-900">Recherche du dossier existant</h3>
+        <p class="text-sm text-slate-500 mt-1">Saisissez la clé de référence reçue lors de l'inscription précédente.</p>
+    </div>
+
+    @* Info banner *@
+    <div class="flex gap-3 rounded-xl bg-blue-50 border border-blue-200 px-4 py-3">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <p class="text-sm text-blue-700">
+            La clé d'identité figure sur le récapitulatif de votre inscription précédente (ex : <span class="font-mono font-semibold">ABC-123456</span>).
+        </p>
+    </div>
+
+    @* Input *@
+    <div class="space-y-2">
+        <label class="block text-sm font-semibold text-slate-700">Clé d'identité</label>
+        <div class="flex gap-3">
+            <input
+                type="text"
+                placeholder="ABC-123456"
+                value="@IdentityKey"
+                @oninput="@( (ChangeEventArgs e) => IdentityKeyChanged.InvokeAsync(e.Value?.ToString() ?? "") )"
+                disabled="@_loading"
+                class="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400
+           focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
+           disabled:opacity-50 disabled:cursor-not-allowed font-mono tracking-widest" />
+            <button
+                @onclick="Search"
+                disabled="@(_loading || string.IsNullOrWhiteSpace(IdentityKey))"
+                class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold
+                       disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2">
+                @if (_loading)
+                {
+                    <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 12 0 12 0v4a8 8 0 00-8 8H0z"></path>
+                    </svg>
+                }
+                Rechercher
+            </button>
+        </div>
+    </div>
+
+    @* Success banner *@
+    @if (_prefillSuccess && _prefillResult != null)
+    {
+        <div class="flex gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+                <p class="text-sm font-semibold text-emerald-800">Dossier trouvé</p>
+                <p class="text-sm text-emerald-700">
+                    @_prefillResult.MatchedFieldCount champ@(_prefillResult.MatchedFieldCount > 1 ? "s" : "") sur @_prefillResult.TotalFieldCount ont été pré-remplis pour
+                    <span class="font-semibold">@_prefillResult.StudentFirstName @_prefillResult.StudentLastName</span>.
+                </p>
+            </div>
+        </div>
+    }
+
+    @* Error banner *@
+    @if (_errorMessage != null)
+    {
+        <div class="flex flex-col gap-3 rounded-xl bg-red-50 border border-red-200 px-4 py-3">
+            <div class="flex gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p class="text-sm text-red-700">@_errorMessage</p>
+            </div>
+            @if (IsReturning)
+            {
+                <p class="self-start text-sm font-semibold text-slate-700 underline underline-offset-2 hover:text-indigo-600 transition-colors">
+                   login to your profile to get the identifier 
+                </p>
+            }
+            else
+            {
+                <button @onclick="ContinueAsNew"
+                        class="self-start text-sm font-semibold text-slate-700 underline underline-offset-2 hover:text-indigo-600 transition-colors">
+                    Continuer comme nouvel élève
+                </button>
+            }
+           
+        </div>
+    }
+
+    @* Navigation *@
+    <div class="flex items-center justify-between pt-2">
+        <button @onclick="OnBack"
+                class="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            Retour
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public EnrollmentSessionDto Session { get; set; } = default!;
+    [Parameter] public string IdentityKey { get; set; } = "";
+    [Parameter] public EventCallback<string> IdentityKeyChanged { get; set; }
+    [Parameter] public EventCallback<ApplicationPrefillResponse> OnPrefillSuccess { get; set; }
+    [Parameter] public EventCallback OnContinueAsNew { get; set; }
+    [Parameter] public EventCallback OnBack { get; set; }
+    [Parameter] public bool IsReturning { get; set; }
+    private bool _loading = false;
+    private bool _prefillSuccess = false;
+    private string? _errorMessage = null;
+    private ApplicationPrefillResponse? _prefillResult = null;
+
+    private async Task Search()
+    {
+        if (string.IsNullOrWhiteSpace(IdentityKey)) return;
+
+        _loading = true;
+        _errorMessage = null;
+        _prefillSuccess = false;
+        _prefillResult = null;
+
+        var response = await EnrollmentService.GetPrefill(IdentityKey, Session.SessionId);
+        _prefillResult = ResultHandler.Handle(response);
+
+        if (_prefillResult is not null)
+        {
+            _prefillSuccess = true;
+            await Task.Delay(600); // let user read the success banner
+            await OnPrefillSuccess.InvokeAsync(_prefillResult);
+        }
+        else
+        {
+            _errorMessage = "Aucun dossier trouvé avec cette clé. Vérifiez la référence ou continuez comme nouvel élève.";
+        }
+
+        _loading = false;
+    }
+
+    private async Task ContinueAsNew()
+    {
+        await OnContinueAsNew.InvokeAsync();
+    }
+}

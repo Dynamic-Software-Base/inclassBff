@@ -1,0 +1,483 @@
+﻿@inject IJSRuntime JS
+
+<div class="space-y-6 pb-10">
+
+    @* ─── ARCHIVED YEAR BANNER ─────────────────────────────────────────── *@
+    @if (IsReadOnly)
+    {
+        <div class="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <svg class="h-5 w-5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+            </svg>
+            <span class="text-sm font-medium text-amber-800">Année académique archivée — consultation uniquement</span>
+        </div>
+    }
+
+    @* ─── HEADER BAR ───────────────────────────────────────────────────── *@
+    @if (IsLoading)
+    {
+        <div class="flex items-center justify-center py-20 text-zinc-400 text-sm gap-2">
+            <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+            </svg>
+            Chargement...
+        </div>
+    }
+    else
+    {
+           <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+            <h2 class="text-xl font-semibold text-zinc-900">Gestion des salles de classe</h2>
+            <p class="mt-1 text-[13px] text-zinc-400">Organisez les classes par cycle et suivez les effectifs par année académique.</p>
+        </div>
+        <div class="flex items-center gap-3 shrink-0">
+            @* Academic year selector *@
+           <div class="flex items-center gap-2">
+    <div class="relative">
+        <select class="appearance-none rounded-lg border border-zinc-200 bg-white py-2 pl-3 pr-8 text-sm font-medium text-zinc-700 shadow-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                value="@SelectedYear"
+                @onchange="OnYearChanged">
+            @foreach (var year in AcademicYears)
+            {
+                <option value="@year">@year@(year == ActiveYear ? " (active)" : "")</option>
+            }
+        </select>
+        <svg class="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+        </svg>
+    </div>
+
+    @if (AddingNewYear)
+    {
+        <div class="flex items-center gap-1.5">
+            <input class="w-28 rounded-lg border border-indigo-300 bg-white px-2 py-2 text-sm text-zinc-800 placeholder:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                   placeholder="2026-2027"
+                   @bind="NewYearValue"
+                   @onkeydown="OnNewYearKeyDown" />
+            <button class="text-indigo-500 hover:text-indigo-700" @onclick="SubmitNewYear">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
+                </svg>
+            </button>
+            <button class="text-zinc-400 hover:text-zinc-600" @onclick="CancelNewYear">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
+                </svg>
+            </button>
+            @if (!string.IsNullOrEmpty(NewYearError))
+            {
+                <span class="text-[11px] text-red-600">@NewYearError</span>
+            }
+        </div>
+    }
+    else
+    {
+        <button title="Nouvelle année académique"
+                class="flex items-center justify-center w-9 h-9 rounded-lg border border-dashed border-zinc-300 text-zinc-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
+                @onclick="() => AddingNewYear = true">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+        </button>
+    }
+</div>
+            @* Batch create button — hidden in read-only mode *@
+            @if (!IsReadOnly)
+            {
+                <button class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-xs hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
+                        @onclick="OpenBatchModal">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                    Créer des classes en lot
+                </button>
+            }
+        </div>
+    </div>
+
+    @* ─── SUMMARY STATS ────────────────────────────────────────────────── *@
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div class="rounded-xl border border-zinc-200 bg-white px-4 py-4 shadow-xs">
+            <p class="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Classes</p>
+            <p class="mt-1 text-2xl font-semibold text-zinc-900">@StatsTotal</p>
+        </div>
+        <div class="rounded-xl border border-zinc-200 bg-white px-4 py-4 shadow-xs">
+            <p class="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Capacité totale</p>
+            <p class="mt-1 text-2xl font-semibold text-zinc-900">@StatsCapacity</p>
+        </div>
+        <div class="rounded-xl border border-zinc-200 bg-white px-4 py-4 shadow-xs">
+            <p class="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Élèves inscrits</p>
+            <p class="mt-1 text-2xl font-semibold text-zinc-900">@StatsEnrolled</p>
+        </div>
+        <div class="rounded-xl border border-zinc-200 bg-white px-4 py-4 shadow-xs">
+            <p class="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Taux de remplissage</p>
+            <p class="mt-1 text-2xl font-semibold @FillRateColor">@StatsFillRate%</p>
+        </div>
+    </div>
+
+    @* ─── CYCLE SECTIONS ───────────────────────────────────────────────── *@
+    @foreach (var cycle in Cycles)
+    {
+        var cycleClasses  = GetClassesForCycle(cycle.Key);
+        var cycleCapacity = cycleClasses.Sum(c => c.MaxStudents);
+        var cycleCount    = cycleClasses.Count;
+
+        <div class="rounded-xl border border-zinc-200 bg-white shadow-xs overflow-hidden">
+
+            @* Cycle header / toggle *@
+            <button class="flex w-full items-center justify-between px-5 py-4 hover:bg-zinc-50 transition-colors"
+                    @onclick="() => ToggleCycle(cycle.Key)">
+                <div class="flex items-center gap-3">
+                    <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50">
+                        <span class="text-sm font-bold text-indigo-600">@cycle.Key[0]</span>
+                    </div>
+                    <div class="text-left">
+                        <span class="text-[15px] font-semibold text-zinc-800">@cycle.Key</span>
+                        <span class="ml-2 rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-500">
+                            @cycleCount classe@(cycleCount != 1 ? "s" : "")
+                        </span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span class="text-[13px] text-zinc-400">
+                        Capacité : <strong class="text-zinc-600">@cycleCapacity</strong>
+                    </span>
+                    <svg class="h-4 w-4 text-zinc-400 transition-transform @(CollapsedCycles.Contains(cycle.Key) ? "" : "rotate-180")"
+                         fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                    </svg>
+                </div>
+            </button>
+
+            @* Cycle body *@
+            @if (!CollapsedCycles.Contains(cycle.Key))
+            {
+                <div class="border-t border-zinc-100 divide-y divide-zinc-100">
+                    @foreach (var grade in cycle.Value)
+                    {
+                        var gradeClasses  = GetClassesForGrade(grade.Id);
+                        var gradeCapacity = gradeClasses.Sum(c => c.MaxStudents);
+                        var gradeEnrolled = gradeClasses.Sum(c => c.EnrolledCount);
+                        double fillPct    = gradeCapacity > 0 ? (double)gradeEnrolled / gradeCapacity * 100 : 0;
+                        string fillBar    = fillPct >= 100 ? "bg-red-500"   : fillPct >= 80 ? "bg-amber-400"  : "bg-emerald-500";
+                        string fillText   = fillPct >= 100 ? "text-red-600" : fillPct >= 80 ? "text-amber-600": "text-emerald-600";
+
+                        <div class="px-5 py-4">
+
+                            @* Grade row header *@
+                            <div class="mb-3 flex flex-wrap items-center gap-3">
+                                <span class="text-[13px] font-semibold text-zinc-700">@grade.NameFr</span>
+                                <span class="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[11px] font-medium text-zinc-500">
+                                    @gradeEnrolled / @gradeCapacity élèves
+                                </span>
+                                <div class="flex flex-1 items-center gap-2 min-w-[100px] max-w-[160px]">
+                                    <div class="flex-1 h-1.5 rounded-full bg-zinc-100">
+                                        <div class="h-1.5 rounded-full @fillBar transition-all"
+                                             style="width: @(Math.Min(fillPct, 100).ToString("F0"))%">
+                                        </div>
+                                    </div>
+                                    <span class="text-[11px] font-medium @fillText shrink-0">@fillPct.ToString("F0")%</span>
+                                </div>
+                            </div>
+
+                            @* Class cards *@
+                            <div class="flex flex-wrap gap-2">
+                                @if (gradeClasses.Count == 0)
+                                {
+                                    <div class="flex items-center gap-2 rounded-lg border border-dashed border-zinc-300 px-4 py-3 text-[13px] text-zinc-400">
+                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                        </svg>
+                                        Aucune classe — ajoutez-en une
+                                    </div>
+                                }
+
+                                @foreach (var cls in gradeClasses)
+                                {
+                                    double clsFill  = cls.MaxStudents > 0 ? (double)cls.EnrolledCount / cls.MaxStudents * 100 : 0;
+                                    string barColor = clsFill >= 100 ? "bg-red-400"   : clsFill >= 80 ? "bg-amber-400"   : "bg-emerald-500";
+                                    string badgeCls = clsFill >= 100
+                                        ? "bg-red-50 border-red-300 text-red-800"
+                                        : clsFill >= 80
+                                            ? "bg-amber-50 border-amber-300 text-amber-800"
+                                            : "bg-emerald-50 border-emerald-300 text-emerald-800";
+
+                                    <div class="group relative bg-white rounded-[14px] border border-zinc-200 hover:border-zinc-300 px-4 py-3.5 min-w-[140px] transition-colors">
+
+                                                @* ── Action buttons (top-right, appear on hover) ── *@
+                                                @if (!IsReadOnly)
+                                                {
+                                                    <div class="absolute top-2.5 right-2.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button title="Renommer"
+                                                                @onclick="() => StartNameEdit(cls)"
+                                                                class="flex items-center justify-center w-7 h-7 rounded-lg border border-zinc-200 bg-white text-zinc-400 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-colors">
+                                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z"/>
+                                                            </svg>
+                                                        </button>
+                                                        <button title="Modifier la capacité"
+                                                                @onclick="() => StartCapacityEdit(cls)"
+                                                                class="flex items-center justify-center w-7 h-7 rounded-lg border border-zinc-200 bg-white text-zinc-400 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-colors">
+                                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75"/>
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                }
+
+                                                @* ── Class name ── *@
+                                                @if (EditingNameId == cls.Id)
+                                                {
+                                                    <div class="flex items-center gap-1 pr-16 mb-2">
+                                                        <input class="w-20 rounded-md border border-indigo-300 bg-white px-2 py-1 text-base font-semibold text-zinc-800 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                                               @bind="EditingNameValue" @onkeydown="e => OnNameKeyDown(e, cls)" />
+                                                        <button class="text-indigo-500 hover:text-indigo-700" @onclick="() => SubmitNameEdit(cls)">
+                                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
+                                                            </svg>
+                                                        </button>
+                                                        <button class="text-zinc-400 hover:text-zinc-600" @onclick="CancelNameEdit">
+                                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <p class="text-[18px] font-semibold text-zinc-900 leading-none mb-2.5 pr-16">@cls.Name</p>
+                                                }
+
+                                                @* ── Fill progress bar ── *@
+                                                <div class="h-1.5 rounded-full bg-zinc-100 overflow-hidden mb-2">
+                                                    <div class="h-full rounded-full @barColor transition-all" style="width: @(clsFill.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))%"></div>
+                                                </div>
+
+                                                @* ── Capacity badge / edit ── *@
+                                                @if (EditingCapacityId == cls.Id)
+                                                {
+                                                    <div class="flex items-center gap-1">
+                                                        <input type="number" min="1" max="60"
+                                                               class="w-16 rounded-md border border-indigo-300 bg-white px-2 py-0.5 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                                               @bind="EditingCapacityValue" @onkeydown="e => OnCapacityKeyDown(e, cls)" />
+                                                        <button class="text-indigo-500 hover:text-indigo-700" @onclick="() => SubmitCapacityEdit(cls)">
+                                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
+                                                            </svg>
+                                                        </button>
+                                                        <button class="text-zinc-400 hover:text-zinc-600" @onclick="CancelCapacityEdit">
+                                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                    @if (!string.IsNullOrEmpty(CapacityEditError))
+                                                    {
+                                                        <p class="mt-1 text-[11px] text-red-600">@CapacityEditError</p>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <span class="inline-flex items-center text-[12px] font-medium px-2.5 py-0.5 rounded-full border @badgeCls">
+                                                        @cls.EnrolledCount / @cls.MaxStudents
+                                                    </span>
+                                                }
+                                            </div>
+                                }
+
+                                @* ── Add single class ────────────────── *@
+                                @if (!IsReadOnly)
+                                {
+                                    @if (AddingClassGradeId == grade.Id)
+                                    {
+                                        <div class="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2.5 space-y-2 min-w-[180px]">
+                                            <p class="text-[11px] font-semibold text-indigo-700 uppercase tracking-wide">Nouvelle classe</p>
+                                            <input class="w-full rounded border border-zinc-200 bg-white px-2 py-1 text-sm text-zinc-800 placeholder:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                                   placeholder="Nom (ex: 5C)"
+                                                   @bind="NewClassName" />
+                                            <input type="number" min="1" max="60"
+                                                   class="w-full rounded border border-zinc-200 bg-white px-2 py-1 text-sm text-zinc-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                                   placeholder="Capacité"
+                                                   @bind="NewClassCapacity" />
+                                            @if (!string.IsNullOrEmpty(NewClassError))
+                                            {
+                                                <p class="text-[10px] text-red-600">@NewClassError</p>
+                                            }
+                                            <div class="flex gap-2">
+                                                <button class="flex-1 rounded bg-indigo-600 py-1 text-[12px] font-medium text-white hover:bg-indigo-700 transition-colors"
+                                                        @onclick="() => SubmitAddClass(grade.Id)">
+                                                    Ajouter
+                                                </button>
+                                                <button class="flex-1 rounded bg-zinc-100 py-1 text-[12px] font-medium text-zinc-600 hover:bg-zinc-200 transition-colors"
+                                                        @onclick="CancelAddClass">
+                                                    Annuler
+                                                </button>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <button class="flex min-h-[64px] min-w-[44px] items-center justify-center rounded-lg border border-dashed border-zinc-300 px-3 text-zinc-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
+                                                @onclick="() => OpenAddClass(grade.Id)">
+                                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                            </svg>
+                                        </button>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+    }
+
+</div>
+
+@* ═══════════════════════════════════════════════════════════════════════════ *@
+@* BATCH CREATION MODAL                                                       *@
+@* ═══════════════════════════════════════════════════════════════════════════ *@
+@if (ShowBatchModal)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+         @onclick="CloseBatchModal">
+        <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden"
+             @onclick:stopPropagation="true">
+
+            @* Modal header *@
+            <div class="flex items-center justify-between border-b border-zinc-100 px-6 py-4">
+                <div>
+                    <h3 class="text-base font-semibold text-zinc-900">Créer des classes en lot</h3>
+                    <p class="mt-0.5 text-[12px] text-zinc-400">Étape @BatchStep sur 2</p>
+                </div>
+                <button class="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
+                        @onclick="CloseBatchModal">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            @* Step progress bar *@
+            <div class="flex gap-1.5 px-6 pt-4">
+                <div class="flex-1 h-1 rounded-full @(BatchStep >= 1 ? "bg-indigo-600" : "bg-zinc-100") transition-colors"></div>
+                <div class="flex-1 h-1 rounded-full @(BatchStep >= 2 ? "bg-indigo-600" : "bg-zinc-100") transition-colors"></div>
+            </div>
+
+            @* Modal body *@
+            <div class="px-6 py-5 space-y-4 max-h-[60vh] overflow-y-auto">
+
+                @if (BatchStep == 1)
+                {
+                    <div>
+                        <label class="block text-[13px] font-medium text-zinc-700 mb-1.5">Niveau / Cycle</label>
+                        <select class="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                @bind="BatchGradeId">
+                            <option value="">— Sélectionner un niveau —</option>
+                            @foreach (var g in AllGrades)
+                            {
+                                <option value="@g.Id">@g.NameFr</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[13px] font-medium text-zinc-700 mb-1.5">Capacité par défaut</label>
+                        <input type="number" min="1" max="60"
+                               class="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                               @bind="BatchDefaultCapacity" />
+                        <p class="mt-1 text-[11px] text-zinc-400">Chaque classe peut avoir sa propre capacité à l'étape suivante.</p>
+                    </div>
+                    @if (!string.IsNullOrEmpty(BatchStep1Error))
+                    {
+                        <p class="text-[12px] text-red-600">@BatchStep1Error</p>
+                    }
+                }
+                else if (BatchStep == 2)
+                {
+                    <p class="text-[13px] text-zinc-500">
+                        Niveau : <strong class="text-zinc-800">@AllGrades.FirstOrDefault(g => g.Id == BatchGradeId)?.NameFr</strong>
+                    </p>
+
+                    <div class="space-y-2">
+                        @for (int i = 0; i < BatchRows.Count; i++)
+                        {
+                            int idx = i; // capture for lambda
+                            <div class="flex items-center gap-2">
+                                <input class="flex-1 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                       placeholder="Nom de la classe (ex: 6A)"
+                                       @bind="BatchRows[idx].Name" />
+                                <input type="number" min="1" max="60"
+                                       class="w-20 rounded-lg border border-zinc-200 bg-white px-2 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                       @bind="BatchRows[idx].Capacity" />
+                                <button class="text-zinc-300 hover:text-red-500 transition-colors disabled:opacity-30"
+                                        @onclick="() => RemoveBatchRow(idx)"
+                                        disabled="@(BatchRows.Count <= 1)">
+                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        }
+                    </div>
+
+                    <button class="flex items-center gap-1.5 text-[13px] font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
+                            @onclick="AddBatchRow">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                        Ajouter une ligne
+                    </button>
+
+                    @* Preview *@
+                    var previewRows = BatchRows.Where(r => !string.IsNullOrWhiteSpace(r.Name)).ToList();
+                    
+                    if (previewRows.Count > 0)
+                    {
+                        <div class="rounded-lg border border-zinc-100 bg-zinc-50 px-4 py-3">
+                            <p class="text-[11px] font-semibold uppercase tracking-wide text-zinc-400 mb-2">Aperçu — @previewRows.Count classe(s)</p>
+                            <div class="space-y-1">
+                                @foreach (var row in previewRows)
+                                {
+                                    <div class="flex items-center justify-between text-[13px]">
+                                        <span class="font-medium text-zinc-800">@row.Name</span>
+                                        <span class="text-zinc-400">@row.Capacity élèves max</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                    @if (!string.IsNullOrEmpty(BatchStep2Error))
+                    {
+                        <p class="text-[12px] text-red-600">@BatchStep2Error</p>
+                    }
+                }
+            </div>
+
+            @* Modal footer *@
+            <div class="flex items-center justify-between border-t border-zinc-100 px-6 py-4">
+                <button class="text-sm text-zinc-500 hover:text-zinc-700 transition-colors"
+                        @onclick="BatchBack">
+                    @(BatchStep == 1 ? "Annuler" : "← Retour")
+                </button>
+                @if (BatchStep == 1)
+                {
+                    <button class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            @onclick="BatchNextStep">
+                        Suivant →
+                    </button>
+                }
+                else
+                {
+                    var submitCount = BatchRows.Count(r => !string.IsNullOrWhiteSpace(r.Name));
+                    <button class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            @onclick="SubmitBatch">
+                        Créer @submitCount classe@(submitCount != 1 ? "s" : "")
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+}

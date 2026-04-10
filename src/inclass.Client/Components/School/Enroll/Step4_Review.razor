@@ -1,0 +1,134 @@
+﻿@using System.Collections.Generic
+@using System
+@using Contract.InClass.Response.Registration
+
+<div class="space-y-6">
+    <div>
+        <h3 class="text-lg font-bold text-slate-900">Récapitulatif de la demande</h3>
+        <p class="text-sm text-slate-500 mt-1">Vérifiez les informations avant de soumettre.</p>
+    </div>
+
+    @* Summary card *@
+    <div class="rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden">
+        @* School & grade *@
+        <div class="px-5 py-4 border-b border-slate-200">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-xs text-slate-400 font-medium uppercase tracking-wide">Établissement</p>
+                    <p class="font-bold text-slate-900 mt-0.5">@SchoolName</p>
+                    <p class="text-sm text-slate-500 mt-0.5">Année @AcademicYear</p>
+                </div>
+                <span class="inline-flex items-center gap-1 rounded-full @(IsReturning ? "bg-emerald-50 border border-emerald-200 text-emerald-700" : "bg-indigo-50 border border-indigo-200 text-indigo-700") px-2.5 py-1 text-xs font-semibold whitespace-nowrap">
+                    @(IsReturning ? "Réinscription" : "Nouvelle inscription")
+                </span>
+            </div>
+        </div>
+
+        @* Grade *@
+        <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+            <div>
+                <p class="text-xs text-slate-400 font-medium uppercase tracking-wide">Niveau</p>
+                <p class="font-semibold text-slate-900 mt-0.5">@Session.GradeName_Fr</p>
+                <p class="text-sm text-slate-400" dir="rtl">@Session.GradeName_Ar</p>
+            </div>
+            <div class="text-right">
+                <p class="text-xs text-slate-400 font-medium uppercase tracking-wide">Places</p>
+                @{
+                    var available = Math.Max(0, Session.MaxSlots - Session.ReservedCount - Session.EnrolledCount);
+                    var isFull = available == 0;
+                }
+                <p class="font-semibold mt-0.5 @(isFull ? "text-red-600" : "text-emerald-600")">
+                    @(isFull ? "Liste d'attente" : $"{available} disponible{(available > 1 ? "s" : "")}")
+                </p>
+            </div>
+        </div>
+
+        @* Student info *@
+        <div class="px-5 py-4 border-b border-slate-200">
+            <p class="text-xs text-slate-400 font-medium uppercase tracking-wide mb-2">Élève</p>
+            <p class="font-semibold text-slate-900">@FirstName @LastName</p>
+        </div>
+
+        @* Contact info *@
+        <div class="px-5 py-4 border-b border-slate-200">
+            <p class="text-xs text-slate-400 font-medium uppercase tracking-wide mb-2">Contact parent</p>
+            <p class="text-sm text-slate-700">@Phone</p>
+            @if (!string.IsNullOrWhiteSpace(Email))
+            {
+                <p class="text-sm text-slate-500">@Email</p>
+            }
+        </div>
+
+        @* Form values *@
+        @if (FormValues.Any())
+        {
+            <div class="px-5 py-4">
+                <p class="text-xs text-slate-400 font-medium uppercase tracking-wide mb-3">Informations du formulaire</p>
+                <div class="space-y-2">
+                    @foreach (var kvp in FormValues.Where(k => !string.IsNullOrWhiteSpace(k.Value)))
+                    {
+                        <div class="flex items-start justify-between gap-4">
+                            <span class="text-sm text-slate-500 font-medium capitalize">@kvp.Key.Replace("_", " ")</span>
+                            <span class="text-sm text-slate-900 text-right">@kvp.Value</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    @* Error *@
+    @if (SubmitError != null)
+    {
+        <div class="flex gap-3 rounded-xl bg-red-50 border border-red-200 px-4 py-3">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p class="text-sm text-red-700">@SubmitError</p>
+        </div>
+    }
+
+    @* Navigation *@
+    <div class="flex items-center justify-between pt-2">
+        <button @onclick="OnBack"
+                disabled="@Submitting"
+                class="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors disabled:opacity-40">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            Retour
+        </button>
+        <button @onclick="OnConfirm"
+                disabled="@Submitting"
+                class="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed">
+            @if (Submitting)
+            {
+                <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 12 0 12 0v4a8 8 0 00-8 8H0z"></path>
+                </svg>
+                <span>Envoi en cours…</span>
+            }
+            else
+            {
+                <span>Confirmer et soumettre</span>
+            }
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public EnrollmentSessionDto Session { get; set; } = default!;
+    [Parameter] public string SchoolName { get; set; } = "";
+    [Parameter] public string AcademicYear { get; set; } = "";
+    [Parameter] public bool IsReturning { get; set; }
+    [Parameter] public string FirstName { get; set; } = "";
+    [Parameter] public string LastName { get; set; } = "";
+    [Parameter] public string Phone { get; set; } = "";
+    [Parameter] public string Email { get; set; } = "";
+    [Parameter] public Dictionary<string, string> FormValues { get; set; } = new();
+    [Parameter] public bool Submitting { get; set; }
+    [Parameter] public string? SubmitError { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnBack { get; set; }
+}

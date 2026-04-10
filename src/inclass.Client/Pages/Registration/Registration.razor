@@ -1,0 +1,560 @@
+﻿@page "/registrations"
+@layout DashboardLayout
+@using System.Collections.Generic
+@using System.Linq
+
+@* @inject IRegistrationSessionService SessionService *@
+
+<div class="min-h-screen bg-[#f4f4f4] font-sans">
+    <div class="flex-1 min-h-0 w-full flex flex-col p-3 ">
+
+        @* ── HEADER ──────────────────────────────────────────────────────────── *@
+        <div class="flex items-center justify-between mb-2 bg-white px-5 py-3 rounded-2xl border border-[#ebebeb] " >
+            <div>
+                <h1 class="text-[22px] font-semibold text-[#111] tracking-tight">Sessions d'inscription</h1>
+                <p class="text-[13px] text-[#999] mt-0.5">Gérez les sessions par année académique et niveau</p>
+            </div>
+            <div class="flex items-center gap-2.5">
+                <select class="h-9 rounded-xl border border-[#e8e8e8] bg-white px-3 text-[13px] text-[#333] focus:outline-none focus:ring-2 focus:ring-[#b5d640]/60 cursor-pointer"
+                        @bind="SelectedYear" @bind:after="OnYearChanged">
+                    @foreach (var y in AcademicYears)
+                    {
+                        <option value="@y">@y</option>
+                    }
+                </select>
+                @if (!IsReadOnly)
+                {
+                    <button class="h-9 flex items-center gap-2 bg-[#c8e646] hover:bg-[#b5d640] text-[#1a1a1a] rounded-xl px-4 text-[13px] font-semibold transition-colors"
+                            @onclick="OpenBatchWizard">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Nouvelle session
+                    </button>
+                }
+            </div>
+        </div>
+
+        @* ── ARCHIVE BANNER ───────────────────────────────────────────────────── *@
+        @if (IsReadOnly)
+        {
+            <div class="rounded-2xl border border-[#f5e4a0] bg-[#fffbea] px-4 py-3 flex items-center gap-3">
+                <div class="w-7 h-7 rounded-lg bg-[#fef3c7] flex items-center justify-center shrink-0">
+                    <svg class="w-4 h-4 text-[#d97706]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+                    </svg>
+                </div>
+                <p class="text-[13px] text-[#92400e] font-medium">Année archivée — consultation uniquement</p>
+            </div>
+        }
+
+        @* ── STATS ROW ────────────────────────────────────────────────────────── *@
+        @if (!IsReadOnly)
+        {
+            var totalOpen      = FilteredSessions.Count(s => s.Status == RegistrationSessionStatus.Open);
+            var totalScheduled = FilteredSessions.Count(s => s.Status == RegistrationSessionStatus.Scheduled);
+            var totalSlots     = FilteredSessions.Sum(s => s.MaxSlots);
+            var totalEnrolled  = FilteredSessions.Sum(s => s.EnrolledCount + s.ReservedCount);
+
+            <div class="grid grid-cols-4 gap-4 mb-3">
+                <div class="bg-white rounded-2xl border border-[#ebebeb] p-4">
+                    <p class="text-[12px] text-[#999] mb-1">Sessions ouvertes</p>
+                    <p class="text-[28px] font-semibold text-[#111] leading-none">@totalOpen</p>
+                    <p class="text-[12px] text-[#999] mt-1">@totalScheduled planifiées</p>
+                </div>
+                <div class="bg-white rounded-2xl border border-[#ebebeb] p-4">
+                    <p class="text-[12px] text-[#999] mb-1">Places totales</p>
+                    <p class="text-[28px] font-semibold text-[#111] leading-none">@totalSlots</p>
+                    <p class="text-[12px] text-[#999] mt-1">cette année</p>
+                </div>
+                <div class="bg-white rounded-2xl border border-[#ebebeb] p-4">
+                    <p class="text-[12px] text-[#999] mb-1">Inscrits / Réservés</p>
+                    <p class="text-[28px] font-semibold text-[#111] leading-none">@totalEnrolled</p>
+                    <div class="mt-2 h-1.5 bg-[#f0f0f0] rounded-full overflow-hidden">
+                        <div class="h-full bg-[#c8e646] rounded-full" style="width:@(Math.Min(100, totalSlots > 0 ? totalEnrolled*100/totalSlots : 0))%"></div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl border border-[#ebebeb] p-4">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <p class="text-[12px] text-[#999] mb-1">Stratégie par défaut</p>
+                            <p class="text-[15px] font-semibold text-[#111]">@StrategyLabel(GlobalStrategy)</p>
+                        </div>
+                        @if (EditingGlobalStrategy)
+                        {
+                            <button class="text-[11px] text-[#999] hover:text-[#333]" @onclick="() => EditingGlobalStrategy = false">✕</button>
+                        }
+                        else
+                        {
+                            <button class="w-7 h-7 rounded-lg border border-[#ebebeb] flex items-center justify-center hover:bg-[#f5f5f5] transition-colors"
+                                    @onclick="() => EditingGlobalStrategy = true">
+                                <svg class="w-3.5 h-3.5 text-[#888]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/>
+                                </svg>
+                            </button>
+                        }
+                    </div>
+                    @if (EditingGlobalStrategy)
+                    {
+                        <div class="mt-2 flex gap-1.5">
+                            <select class="flex-1 rounded-lg border border-[#e8e8e8] bg-[#fafafa] px-2 py-1 text-[12px] focus:outline-none focus:ring-2 focus:ring-[#b5d640]/60"
+                                    @bind="GlobalStrategy">
+                                @foreach (AssignmentStrategy s in Enum.GetValues(typeof(AssignmentStrategy)))
+                                {
+                                    <option value="@s">@StrategyLabel(s)</option>
+                                }
+                            </select>
+                            <button class="h-7 px-2.5 rounded-lg bg-[#c8e646] text-[11px] font-semibold text-[#1a1a1a]"
+                                    @onclick="SaveGlobalStrategy">OK</button>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @* ── SESSION LIST ─────────────────────────────────────────────────────── *@
+        @foreach (var cycle in CycleGroups)
+        {
+            var sessions   = FilteredSessions.Where(s => s.CycleName == cycle).ToList();
+            var isExpanded = ExpandedCycles.Contains(cycle);
+
+            <div class="bg-white rounded-2xl border border-[#ebebeb] overflow-hidden">
+                <button class="w-full flex items-center justify-between px-5 py-4 hover:bg-[#fafafa] transition-colors"
+                        @onclick="() => ToggleCycle(cycle)">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-xl @CycleBg(cycle) flex items-center justify-center shrink-0">
+                            <svg class="w-4 h-4 @CycleIcon(cycle)" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A55.378 55.378 0 0112 8.443m-7.007 11.55A5.981 5.981 0 006.75 15.75v-1.5"/>
+                            </svg>
+                        </div>
+                        <span class="text-[14px] font-semibold text-[#111]">@cycle</span>
+                        <span class="text-[12px] text-[#bbb] font-normal">@sessions.Count session@(sessions.Count != 1 ? "s" : "")</span>
+                    </div>
+                    <svg class="w-4 h-4 text-[#bbb] transition-transform duration-200 @(isExpanded ? "rotate-180" : "")" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/>
+                    </svg>
+                </button>
+
+                @if (isExpanded && sessions.Any())
+                {
+                    <div class="border-t border-[#f0f0f0]">
+                        <div class="grid grid-cols-[2fr_1fr_1.5fr_1fr_1fr_auto] gap-4 px-5 py-2.5 bg-[#fafafa] border-b border-[#f0f0f0]">
+                            <span class="text-[11px] font-medium text-[#aaa] uppercase tracking-wide">Niveau</span>
+                            <span class="text-[11px] font-medium text-[#aaa] uppercase tracking-wide">Statut</span>
+                            <span class="text-[11px] font-medium text-[#aaa] uppercase tracking-wide">Période</span>
+                            <span class="text-[11px] font-medium text-[#aaa] uppercase tracking-wide">Capacité</span>
+                            <span class="text-[11px] font-medium text-[#aaa] uppercase tracking-wide">Stratégie</span>
+                            <span class="text-[11px] font-medium text-[#aaa] uppercase tracking-wide">Actions</span>
+                        </div>
+
+                        @foreach (var session in sessions)
+                        {
+                            var fill = (session.ReservedCount + session.EnrolledCount) * 100 / Math.Max(1, session.MaxSlots);
+                            <div class="grid grid-cols-[2fr_1fr_1.5fr_1fr_1fr_auto] gap-4 items-center px-5 py-3.5 border-b border-[#f7f7f7] last:border-b-0 hover:bg-[#fafafa] transition-colors group">
+
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="text-[14px] font-medium text-[#111] truncate">@session.GradeNameFr</span>
+                                        @if (session.WaitlistCount > 0)
+                                        {
+                                            <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[#fff4e0] text-[#d97706]">@session.WaitlistCount en attente</span>
+                                        }
+                                    </div>
+                                    <div class="flex items-center gap-2 mt-0.5">
+                                        @if (session.DailyQuota.HasValue)
+                                        {
+                                            <span class="text-[11px] text-[#bbb]">@session.DailyQuota/jour</span>
+                                        }
+                                        @if (session.Status == RegistrationSessionStatus.Open && ActivePhase(session) is { } ph)
+                                        {
+                                            <span class="text-[11px] text-[#7db800]">● @PhaseTypeLabel(ph.PhaseType)</span>
+                                        }
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <span class="inline-flex items-center gap-1.5 text-[12px] font-medium @StatusClass(session.Status)">
+                                        <span class="w-1.5 h-1.5 rounded-full @StatusDot(session.Status)"></span>
+                                        @StatusLabel(session.Status)
+                                    </span>
+                                </div>
+
+                                <div>
+                                    <span class="text-[12px] text-[#555]">@session.OpenDate.ToString("dd MMM yy")</span>
+                                    <span class="text-[12px] text-[#ccc] mx-1">→</span>
+                                    <span class="text-[12px] text-[#555]">@session.CloseDate?.ToString("dd MMM yy")</span>
+                                </div>
+
+                                <div>
+                                    <div class="flex items-center justify-between mb-1">
+                                        <span class="text-[12px] text-[#555] font-medium">@(session.ReservedCount + session.EnrolledCount)<span class="text-[#bbb] font-normal">/@session.MaxSlots</span></span>
+                                        <span class="text-[11px] text-[#bbb]">@fill%</span>
+                                    </div>
+                                    <div class="h-1 bg-[#f0f0f0] rounded-full overflow-hidden w-full">
+                                        <div class="h-full rounded-full transition-all @(fill >= 90 ? "bg-[#ef4444]" : fill >= 60 ? "bg-[#f59e0b]" : "bg-[#c8e646]")"
+                                             style="width:@(Math.Min(100, fill))%"></div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <span class="text-[12px] text-[#777]">@StrategyLabel(session.AssignmentStrategy)</span>
+                                </div>
+
+                                <div class="flex items-center gap-1.5 justify-end">
+                                    @if (!IsReadOnly && (session.Status == RegistrationSessionStatus.Scheduled || session.Status == RegistrationSessionStatus.Open))
+                                    {
+                                        <button class="w-7 h-7 rounded-lg border border-[#ebebeb] flex items-center justify-center hover:bg-[#f5f5f5] transition-colors opacity-0 group-hover:opacity-100"
+                                                title="Modifier" @onclick="() => OpenEditPanel(session)">
+                                            <svg class="w-3.5 h-3.5 text-[#888]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/>
+                                            </svg>
+                                        </button>
+                                    }
+                                    @if (!IsReadOnly && session.Status == RegistrationSessionStatus.Scheduled)
+                                    {
+                                        <button class="h-7 px-3 rounded-lg bg-[#eefbbf] hover:bg-[#c8e646] text-[12px] font-semibold text-[#4a7c00] transition-colors"
+                                                @onclick="async () => await OpenSession(session)">Ouvrir</button>
+                                        <button class="h-7 px-3 rounded-lg border border-[#f0f0f0] hover:bg-[#fff0f0] text-[12px] font-medium text-[#ef4444] transition-colors"
+                                                @onclick="async () => await CancelSession(session)">Annuler</button>
+                                    }
+                                    else if (!IsReadOnly && session.Status == RegistrationSessionStatus.Open)
+                                    {
+                                        <button class="h-7 px-3 rounded-lg border border-[#e8e8e8] hover:bg-[#f5f5f5] text-[12px] font-medium text-[#555] transition-colors"
+                                                @onclick="async () => await CloseSession(session)">Fermer</button>
+                                    }
+                                    else if (session.Status == RegistrationSessionStatus.Closed || session.Status == RegistrationSessionStatus.Cancelled)
+                                    {
+                                        <span class="text-[11px] text-[#ccc]">Archivé</span>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        @if (!FilteredSessions.Any())
+        {
+            <div class="bg-white rounded-2xl border border-[#ebebeb] px-8 py-20 text-center">
+                <div class="w-12 h-12 rounded-2xl bg-[#f5f5f5] flex items-center justify-center mx-auto mb-3">
+                    <svg class="w-6 h-6 text-[#ccc]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75"/>
+                    </svg>
+                </div>
+                <p class="text-[14px] font-medium text-[#999]">Aucune session pour cette année</p>
+                @if (!IsReadOnly)
+                {
+                    <button class="mt-3 text-[13px] text-[#7db800] hover:underline font-medium" @onclick="OpenBatchWizard">Créer des sessions en lot →</button>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@* ════════════════════════════════════════════════════════════════════════════ *@
+@*  EDIT PANEL                                                                 *@
+@* ════════════════════════════════════════════════════════════════════════════ *@
+@if (EditPanelSession != null)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm" @onclick="CloseEditPanel">
+        <div class="w-full max-w-xl rounded-3xl bg-white shadow-2xl overflow-hidden" @onclick:stopPropagation="true">
+            <div class="flex items-center justify-between px-6 py-5 border-b border-[#f0f0f0]">
+                <div>
+                    <h2 class="text-[16px] font-semibold text-[#111]">Modifier la session</h2>
+                    <p class="text-[12px] text-[#aaa] mt-0.5">@EditPanelSession.GradeNameFr</p>
+                </div>
+                <button class="w-8 h-8 rounded-xl bg-[#f5f5f5] hover:bg-[#ebebeb] flex items-center justify-center transition-colors" @onclick="CloseEditPanel">
+                    <svg class="w-4 h-4 text-[#888]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="flex gap-1 px-6 pt-4">
+                @foreach (var tab in new[] { "Période", "Quota", "Stratégie" })
+                {
+                    <button class="px-4 py-2 rounded-xl text-[13px] font-medium transition-colors @(EditTab == tab ? "bg-[#c8e646] text-[#1a1a1a]" : "text-[#888] hover:bg-[#f5f5f5]")"
+                            @onclick="() => EditTab = tab">@tab</button>
+                }
+            </div>
+
+            <div class="px-6 py-5">
+                @if (EditTab == "Période")
+                {
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[12px] font-medium text-[#888] mb-2">Date d'ouverture</label>
+                            <input type="date" class="w-full rounded-xl border border-[#e8e8e8] bg-[#fafafa] px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#b5d640]/60" @bind="EditOpenDate"/>
+                        </div>
+                        <div>
+                            <label class="block text-[12px] font-medium text-[#888] mb-2">Date de clôture</label>
+                            <input type="date" class="w-full rounded-xl border border-[#e8e8e8] bg-[#fafafa] px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#b5d640]/60" @bind="EditCloseDate"/>
+                        </div>
+                    </div>
+                }
+                else if (EditTab == "Quota")
+                {
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-[12px] font-medium text-[#888] mb-2">Quota journalier <span class="font-normal text-[#bbb]">(optionnel)</span></label>
+                                <input type="number" min="1" placeholder="ex : 20" class="w-full rounded-xl border border-[#e8e8e8] bg-[#fafafa] px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#b5d640]/60" @bind="EditDailyQuota"/>
+                            </div>
+                            <div>
+                                <label class="block text-[12px] font-medium text-[#888] mb-2">Heure limite</label>
+                                <input type="time" class="w-full rounded-xl border border-[#e8e8e8] bg-[#fafafa] px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#b5d640]/60" @bind="EditCutoffTime"/>
+                            </div>
+                        </div>
+                        <div class="rounded-2xl bg-[#f8fbec] border border-[#e4f0a8] px-4 py-3">
+                            <p class="text-[12px] text-[#6a8c00]">Le quota détermine la date estimée de traitement remise à chaque candidat. Si non défini, aucune date estimée ne sera calculée.</p>
+                        </div>
+                    </div>
+                }
+                else if (EditTab == "Stratégie")
+                {
+                    <div class="grid grid-cols-2 gap-2.5">
+                        @foreach (var strat in StrategyOptions)
+                        {
+                            <button class="text-left rounded-2xl border-2 p-3.5 transition-all @(EditStrategy == strat.Value ? "border-[#c8e646] bg-[#f8fbec]" : "border-[#f0f0f0] hover:border-[#e0e0e0] bg-white")"
+                                    @onclick="() => EditStrategy = strat.Value">
+                                <p class="text-[13px] font-semibold @(EditStrategy == strat.Value ? "text-[#4a7c00]" : "text-[#222]")">@strat.Label</p>
+                                <p class="text-[11px] @(EditStrategy == strat.Value ? "text-[#7db800]" : "text-[#aaa]") mt-0.5">@strat.Description</p>
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="flex items-center justify-end gap-2.5 px-6 py-4 border-t border-[#f0f0f0] bg-[#fafafa]">
+                <button class="h-9 px-4 rounded-xl border border-[#e8e8e8] text-[13px] font-medium text-[#666] hover:bg-[#f0f0f0] transition-colors" @onclick="CloseEditPanel">Annuler</button>
+                <button class="h-9 px-5 rounded-xl bg-[#c8e646] hover:bg-[#b5d640] text-[13px] font-semibold text-[#1a1a1a] transition-colors" @onclick="SaveEditPanel">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ════════════════════════════════════════════════════════════════════════════ *@
+@*  BATCH WIZARD                                                               *@
+@* ════════════════════════════════════════════════════════════════════════════ *@
+@if (ShowBatchWizard)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm" @onclick="CloseWizard">
+        <div class="w-full max-w-xl rounded-3xl bg-white shadow-2xl overflow-hidden flex flex-col max-h-[88vh]" @onclick:stopPropagation="true">
+
+            <div class="flex items-center justify-between px-6 py-5 border-b border-[#f0f0f0]">
+                <div>
+                    <h2 class="text-[16px] font-semibold text-[#111]">Nouvelle session en lot</h2>
+                    <p class="text-[12px] text-[#aaa] mt-0.5">Étape @WizardStep sur 3</p>
+                </div>
+                <button class="w-8 h-8 rounded-xl bg-[#f5f5f5] hover:bg-[#ebebeb] flex items-center justify-center transition-colors" @onclick="CloseWizard">
+                    <svg class="w-4 h-4 text-[#888]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="px-6 pt-4 pb-1">
+                <div class="flex items-end gap-3">
+                    @{ var stepNames = new[] { "Niveaux", "Période & Phases", "Traitement" }; }
+                    @for (int i = 0; i < 3; i++)
+                    {
+                        var idx = i;
+                        <div class="flex-1 flex flex-col gap-1">
+                            <div class="w-full h-1 rounded-full @(WizardStep > idx ? "bg-[#c8e646]" : WizardStep == idx+1 ? "bg-[#c8e646]" : "bg-[#f0f0f0]")"></div>
+                            <span class="text-[11px] @(WizardStep == idx+1 ? "text-[#555] font-semibold" : "text-[#bbb]")">@stepNames[idx]</span>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto px-6 py-4">
+
+                @if (WizardStep == 1)
+                {
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-[12px] text-[#aaa]">Année académique :</span>
+                            <span class="text-[12px] font-semibold text-[#333] bg-[#f5f5f5] rounded-lg px-2 py-0.5">@SelectedYear</span>
+                        </div>
+                        @foreach (var cycleGroup in GradesGroupedByCycle)
+                        {
+                            var cg = cycleGroup.Value;
+                            var allSel = cg.All(g => WizardSelectedGrades.Contains(g.Id) || GradeCapacities.GetValueOrDefault(g.Id,0)==0);
+                            <div class="rounded-2xl border border-[#ebebeb] overflow-hidden">
+                                <div class="flex items-center justify-between px-4 py-3 bg-[#fafafa]">
+                                    <span class="text-[13px] font-semibold text-[#333]">@cycleGroup.Key</span>
+                                    <button class="text-[12px] text-[#7db800] font-medium hover:underline"
+                                            @onclick="() => ToggleAllCycleGrades(cycleGroup.Key, !allSel)">
+                                        @(allSel ? "Tout désélectionner" : "Tout sélectionner")
+                                    </button>
+                                </div>
+                                @foreach (var grade in cg)
+                                {
+                                    var cap   = GradeCapacities.GetValueOrDefault(grade.Id, 0);
+                                    var hasCap = cap > 0;
+                                    var isSel  = WizardSelectedGrades.Contains(grade.Id) && hasCap;
+                                    <div class="flex items-center justify-between px-4 py-3 border-t border-[#f5f5f5] @(hasCap ? "cursor-pointer hover:bg-[#fafafa]" : "opacity-40") transition-colors"
+                                         @onclick="() => { if(hasCap) ToggleGradeSelection(grade.Id); }">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-4 h-4 rounded-md border-2 flex items-center justify-center @(isSel ? "bg-[#c8e646] border-[#c8e646]" : "border-[#d0d0d0]")">
+                                                @if (isSel)
+                                                {
+                                                    <svg class="w-2.5 h-2.5 text-[#1a1a1a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+                                                    </svg>
+                                                }
+                                            </div>
+                                            <span class="text-[13px] text-[#333]">@grade.NameFr</span>
+                                            @if (!hasCap) { <span class="text-[11px] text-[#bbb] italic">Aucune classe</span> }
+                                        </div>
+                                        @if (hasCap) { <span class="text-[12px] text-[#aaa] font-medium">@cap places</span> }
+                                    </div>
+                                }
+                            </div>
+                        }
+                        @if (!string.IsNullOrEmpty(WizardStep1Error))
+                        {
+                            <p class="text-[12px] text-red-500">@WizardStep1Error</p>
+                        }
+                    </div>
+                }
+
+                else if (WizardStep == 2)
+                {
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[12px] font-medium text-[#888] mb-2">Ouverture</label>
+                                <input type="date" class="w-full rounded-xl border border-[#e8e8e8] bg-[#fafafa] px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#b5d640]/60" @bind="WizardOpenDate"/>
+                            </div>
+                            <div>
+                                <label class="block text-[12px] font-medium text-[#888] mb-2">Clôture</label>
+                                <input type="date" class="w-full rounded-xl border border-[#e8e8e8] bg-[#fafafa] px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#b5d640]/60" @bind="WizardCloseDate"/>
+                            </div>
+                        </div>
+                        <div class="rounded-2xl border border-[#ebebeb] p-4">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-[13px] font-semibold text-[#222]">Phase de ré-inscription</p>
+                                    <p class="text-[11px] text-[#bbb] mt-0.5">Priorité aux élèves existants</p>
+                                </div>
+                                <button class="relative w-10 h-[22px] rounded-full transition-colors @(WizardIncludeReRegistration ? "bg-[#c8e646]" : "bg-[#e0e0e0]")"
+                                        @onclick="() => WizardIncludeReRegistration = !WizardIncludeReRegistration">
+                                    <span class="absolute top-[3px] w-4 h-4 rounded-full bg-white shadow-sm transition-all @(WizardIncludeReRegistration ? "left-[22px]" : "left-[3px]")"></span>
+                                </button>
+                            </div>
+                            @if (WizardIncludeReRegistration)
+                            {
+                                <div class="mt-3 space-y-3">
+                                    <div class="rounded-xl bg-[#f8fbec] border border-[#e4f0a8] p-3">
+                                        <p class="text-[11px] font-semibold text-[#7db800] mb-2">Phase 1 — Ré-inscription</p>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <input type="date" class="rounded-lg border border-[#ddeea0] bg-white px-2.5 py-1.5 text-[12px] focus:outline-none" @bind="WizardPhase1Start"/>
+                                            <input type="date" class="rounded-lg border border-[#ddeea0] bg-white px-2.5 py-1.5 text-[12px] focus:outline-none" @bind="WizardPhase1End"/>
+                                        </div>
+                                    </div>
+                                    <div class="rounded-xl bg-[#f5f5f5] border border-[#e8e8e8] p-3">
+                                        <p class="text-[11px] font-semibold text-[#888] mb-2">Phase 2 — Inscriptions ouvertes</p>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <input type="date" class="rounded-lg border border-[#e0e0e0] bg-white px-2.5 py-1.5 text-[12px] focus:outline-none" @bind="WizardPhase2Start"/>
+                                            <input type="date" class="rounded-lg border border-[#e0e0e0] bg-white px-2.5 py-1.5 text-[12px] focus:outline-none" @bind="WizardPhase2End"/>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <div>
+                                <label class="block text-[12px] font-medium text-[#888] mb-2">Heure limite</label>
+                                <input type="time" class="rounded-xl border border-[#e8e8e8] bg-[#fafafa] px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#b5d640]/60" @bind="WizardCutoffTime"/>
+                            </div>
+                            <p class="text-[11px] text-[#bbb] mt-4 leading-snug">Dossiers reçus après cette heure sont traités le lendemain</p>
+                        </div>
+                        @if (!string.IsNullOrEmpty(WizardStep2Error))
+                        {
+                            <p class="text-[12px] text-red-500">@WizardStep2Error</p>
+                        }
+                    </div>
+                }
+
+                else if (WizardStep == 3)
+                {
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-[12px] font-medium text-[#888] mb-2">Quota journalier <span class="font-normal text-[#bbb]">(optionnel)</span></label>
+                            <div class="rounded-2xl bg-[#f8fbec] border border-[#e4f0a8] px-4 py-3 mb-3">
+                                <p class="text-[12px] text-[#6a8c00]">Si défini, chaque candidat reçoit une date estimée de traitement calculée automatiquement selon sa position et le quota journalier.</p>
+                            </div>
+                            <input type="number" min="1" placeholder="Laisser vide pour désactiver"
+                                   class="w-full rounded-xl border border-[#e8e8e8] bg-[#fafafa] px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#b5d640]/60"
+                                   @bind="WizardDailyQuota"/>
+                        </div>
+                        <div>
+                            <label class="block text-[12px] font-medium text-[#888] mb-2">Stratégie d'assignation</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                @foreach (var strat in StrategyOptions)
+                                {
+                                    <button class="text-left rounded-2xl border-2 p-3 transition-all @(WizardStrategy == strat.Value ? "border-[#c8e646] bg-[#f8fbec]" : "border-[#f0f0f0] hover:border-[#e0e0e0]")"
+                                            @onclick="() => WizardStrategy = strat.Value">
+                                        <p class="text-[13px] font-semibold @(WizardStrategy == strat.Value ? "text-[#4a7c00]" : "text-[#222]")">@strat.Label</p>
+                                        <p class="text-[11px] @(WizardStrategy == strat.Value ? "text-[#7db800]" : "text-[#aaa]") mt-0.5">@strat.Description</p>
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                        <div class="rounded-2xl border border-[#ebebeb] overflow-hidden">
+                            <div class="bg-[#fafafa] px-4 py-3">
+                                <p class="text-[11px] font-semibold text-[#aaa] uppercase tracking-wide">Récapitulatif</p>
+                            </div>
+                            <div class="px-4 py-3 space-y-2">
+                                <div class="flex justify-between text-[13px]">
+                                    <span class="text-[#aaa]">Période</span>
+                                    <span class="font-medium text-[#333]">@WizardOpenDate.ToString("dd/MM/yy") → @WizardCloseDate.ToString("dd/MM/yy")</span>
+                                </div>
+                                <div class="flex justify-between text-[13px]">
+                                    <span class="text-[#aaa]">Stratégie</span>
+                                    <span class="font-medium text-[#333]">@StrategyLabel(WizardStrategy)</span>
+                                </div>
+                                @if (WizardDailyQuota.HasValue)
+                                {
+                                    <div class="flex justify-between text-[13px]">
+                                        <span class="text-[#aaa]">Quota</span>
+                                        <span class="font-medium text-[#333]">@WizardDailyQuota/jour</span>
+                                    </div>
+                                }
+                                <div class="pt-2 border-t border-[#f5f5f5]">
+                                    @foreach (var gId in WizardSelectedGrades)
+                                    {
+                                        var g = AllGrades.FirstOrDefault(x => x.Id == gId);
+                                        if (g == null) continue;
+                                        <div class="flex justify-between text-[12px] py-0.5">
+                                            <span class="text-[#555]">@g.NameFr</span>
+                                            <span class="text-[#aaa]">@GradeCapacities.GetValueOrDefault(gId,0) places</span>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="flex items-center justify-between px-6 py-4 border-t border-[#f0f0f0] bg-[#fafafa]">
+                <button class="h-9 px-4 rounded-xl border border-[#e8e8e8] text-[13px] font-medium text-[#666] hover:bg-[#f0f0f0] transition-colors @(WizardStep == 1 ? "invisible" : "")"
+                        @onclick="WizardBack">← Précédent</button>
+                @if (WizardStep < 3)
+                {
+                    <button class="h-9 px-5 rounded-xl bg-[#c8e646] hover:bg-[#b5d640] text-[13px] font-semibold text-[#1a1a1a] transition-colors" @onclick="WizardNext">Suivant →</button>
+                }
+                else
+                {
+                    <button class="h-9 px-5 rounded-xl bg-[#c8e646] hover:bg-[#b5d640] text-[13px] font-semibold text-[#1a1a1a] transition-colors" @onclick="SubmitBatchWizard">
+                        Créer @WizardSelectedGrades.Count session@(WizardSelectedGrades.Count != 1 ? "s" : "")
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+}
+

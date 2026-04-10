@@ -1,0 +1,306 @@
+﻿@using System.Text.Json
+@using System.Collections.Generic
+@using System.Linq
+@using Contract.InClass.Response.Registration
+
+<div class="space-y-6">
+    <div>
+        <h3 class="text-lg font-bold text-slate-900">Informations de la demande</h3>
+        <p class="text-sm text-slate-500 mt-1">Remplissez tous les champs obligatoires marqués d'un <span class="text-red-500 font-bold">*</span></p>
+    </div>
+
+    @if (IsReturning && PrefillData != null)
+    {
+        <div class="flex gap-3 rounded-xl bg-blue-50 border border-blue-200 px-4 py-3">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <p class="text-sm text-blue-700">
+                <span class="font-semibold">@PrefillData.MatchedFieldCount champ@(PrefillData.MatchedFieldCount > 1 ? "s" : "") pré-rempli@(PrefillData.MatchedFieldCount > 1 ? "s" : "")</span>
+                depuis votre dossier précédent. Veuillez vérifier et compléter les informations manquantes.
+            </p>
+        </div>
+    }
+    
+
+    @* Dynamic schema sections *@
+    @if (_sections != null)
+    {
+        @foreach (var item in _sections)
+        {
+            @* Skip item if its displayCondition is not met *@
+            @if (!EvaluateCondition(item.DisplayCondition))
+            {
+                continue;
+            }
+
+            <div class="space-y-4">
+                <div class="flex items-center gap-3">
+                    <span class="text-xs font-bold uppercase tracking-widest text-slate-400">@item.Title</span>
+                    <div class="flex-1 h-px bg-slate-100"></div>
+                </div>
+
+                @if (item.Fields != null)
+                {
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        @foreach (var field in item.Fields)
+                        {
+                            @* Skip field if its displayCondition is not met *@
+                            @if (!EvaluateCondition(field.DisplayCondition))
+                            {
+                                continue;
+                            }
+
+                            var fieldKey = field.Key;
+                            var fieldError = _fieldErrors.TryGetValue(fieldKey, out var fe) ? fe : null;
+
+                            <div class="@(field.Type is "textarea" or "boolean" ? "sm:col-span-2" : "")">
+                                @if (field.Type == "boolean")
+                                {
+                                    @* Boolean: render as a styled toggle row *@
+                                    <div class="flex items-center justify-between rounded-xl border @(fieldError != null ? "border-red-300 bg-red-50" : "border-slate-200 bg-white") px-4 py-3">
+                                        <div>
+                                            <p class="text-sm font-semibold text-slate-700">
+                                                @field.Label
+                                                @if (field.Required) { <span class="text-red-500"> *</span> }
+                                            </p>
+                                            @if (field.Hint != null)
+                                            {
+                                                <p class="text-xs text-slate-400 mt-0.5">@field.Hint</p>
+                                            }
+                                        </div>
+                                        <button type="button"
+                                                @onclick="@(() => ToggleBoolean(fieldKey))"
+                                                class="@GetToggleClass(fieldKey) relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                                            <span class="@GetToggleKnobClass(fieldKey) pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200"></span>
+                                        </button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+                                        @field.Label
+                                        @if (field.Required) { <span class="text-red-500"> *</span> }
+                                    </label>
+
+                                    @if (field.Type == "textarea")
+                                    {
+                                        <textarea rows="3"
+                                                  value="@GetFieldValue(fieldKey)"
+                                                  @oninput="@((ChangeEventArgs e) => SetFieldValue(fieldKey, e.Value?.ToString() ?? ""))"
+                                                  placeholder="@(field.Placeholder ?? field.Label)"
+                                                  class="@GetInputClass(fieldError) resize-none"></textarea>
+                                    }
+                                    else if (field.Type == "select" && field.Options != null)
+                                    {
+                                        <select value="@GetFieldValue(fieldKey)"
+                                                @onchange="@((ChangeEventArgs e) => SetFieldValue(fieldKey, e.Value?.ToString() ?? ""))"
+                                                class="@GetInputClass(fieldError)">
+                                            <option value="">— Sélectionner —</option>
+                                            @foreach (var opt in field.Options)
+                                            {
+                                                <option value="@opt.Value" selected="@(GetFieldValue(fieldKey) == opt.Value)">@opt.Label</option>
+                                            }
+                                        </select>
+                                    }
+                                    else
+                                    {
+                                        <input type="@(field.Type == "date" ? "date" : field.Type == "number" ? "number" : "text")"
+                                               value="@GetFieldValue(fieldKey)"
+                                               @oninput="@((ChangeEventArgs e) => SetFieldValue(fieldKey, e.Value?.ToString() ?? ""))"
+                                               placeholder="@(field.Placeholder ?? field.Label)"
+                                               step="@(field.Type == "number" ? "0.01" : null)"
+                                               class="@GetInputClass(fieldError)" />
+                                    }
+
+                                    @if (field.Hint != null && fieldError == null)
+                                    {
+                                        <p class="text-xs text-slate-400 mt-1">@field.Hint</p>
+                                    }
+                                }
+
+                                @if (fieldError != null)
+                                {
+                                    <p class="text-xs text-red-500 mt-1">@fieldError</p>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    }
+
+    @* Navigation *@
+    <div class="flex items-center justify-between pt-2">
+        <button @onclick="OnBack"
+                class="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            Retour
+        </button>
+        <button @onclick="Validate"
+                class="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors shadow-sm">
+            Suivant
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string? SchemaJson { get; set; }
+    [Parameter] public bool IsReturning { get; set; }
+    [Parameter] public ApplicationPrefillResponse? PrefillData { get; set; }
+    [Parameter] public Dictionary<string, string> FormValues { get; set; } = new();
+    [Parameter] public EventCallback<Dictionary<string, string>> OnNext { get; set; }
+    [Parameter] public EventCallback OnBack { get; set; }
+
+    private List<SchemaSection>? _sections;
+    private Dictionary<string, string?> _fieldErrors = new();
+
+    protected override void OnParametersSet()
+    {
+        if (SchemaJson != null && _sections == null)
+            ParseSchema();
+    }
+
+    private void ParseSchema()
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(SchemaJson!);
+            var root = doc.RootElement;
+            _sections = new List<SchemaSection>();
+
+            foreach (var item in root.GetProperty("sections").EnumerateArray())
+            {
+                var sectionKey   = item.TryGetProperty("key",   out var sk) ? sk.GetString() ?? "" : "";
+                var sectionTitle = item.TryGetProperty("title", out var st) ? st.GetString() ?? "" : "";
+                var sectionCond  = ParseCondition(item);
+
+                var fields = new List<SchemaField>();
+                if (item.TryGetProperty("fields", out var fieldsEl))
+                {
+                    foreach (var f in fieldsEl.EnumerateArray())
+                    {
+                        var options = new List<SchemaOption>();
+                        if (f.TryGetProperty("options", out var optsEl) && optsEl.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var o in optsEl.EnumerateArray())
+                            {
+                                var val = o.TryGetProperty("value", out var ov) ? ov.GetString() ?? "" : "";
+                                var lbl = o.TryGetProperty("label", out var ol) ? ol.GetString() ?? val : val;
+                                options.Add(new SchemaOption(val, lbl));
+                            }
+                        }
+
+                        fields.Add(new SchemaField(
+                            Key:              f.GetProperty("key").GetString() ?? "",
+                            Label:            f.GetProperty("label").GetString() ?? "",
+                            Type:             f.TryGetProperty("fieldType", out var ft) ? ft.GetString() ?? "text" : "text",
+                            Required:         f.TryGetProperty("isRequired", out var req) && req.GetBoolean(),
+                            Placeholder:      f.TryGetProperty("placeholder", out var ph) && ph.ValueKind != JsonValueKind.Null ? ph.GetString() : null,
+                            Hint:             f.TryGetProperty("hint",        out var h)  && h.ValueKind  != JsonValueKind.Null ? h.GetString()  : null,
+                            Options:          options.Count > 0 ? options : null,
+                            DisplayCondition: ParseCondition(f)
+                        ));
+                    }
+                }
+
+                _sections.Add(new SchemaSection(sectionKey, sectionTitle, fields.Count > 0 ? fields : null, sectionCond));
+            }
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e.Message);
+            _sections = new List<SchemaSection>();
+        }
+    }
+    private static FieldCondition? ParseCondition(JsonElement el)
+    {
+        if (!el.TryGetProperty("displayCondition", out var cond) || cond.ValueKind == JsonValueKind.Null)
+            return null;
+
+        var field    = cond.TryGetProperty("field",    out var cf) ? cf.GetString() : null;
+        var op       = cond.TryGetProperty("operator", out var co) ? co.GetString() : "eq";
+        var value    = cond.TryGetProperty("value",    out var cv) ? cv.GetString() : null;
+
+        return field != null ? new FieldCondition(field, op ?? "eq", value ?? "") : null;
+    }
+
+    // Evaluate whether a condition is satisfied given current FormValues
+    private bool EvaluateCondition(FieldCondition? condition)
+    {
+        if (condition == null) return true; // no condition = always visible
+
+        var currentValue = GetFieldValue(condition.Field);
+        return condition.Operator switch
+        {
+            "eq"  => currentValue == condition.Value,
+            "neq" => currentValue != condition.Value,
+            _     => true
+        };
+    }
+
+    private void ToggleBoolean(string key)
+    {
+        var current = GetFieldValue(key);
+        SetFieldValue(key, current == "true" ? "false" : "true");
+    }
+
+    private string GetToggleClass(string key) =>
+        GetFieldValue(key) == "true"
+            ? "bg-indigo-600"
+            : "bg-slate-200";
+
+    private string GetToggleKnobClass(string key) =>
+        GetFieldValue(key) == "true"
+            ? "translate-x-5"
+            : "translate-x-0";
+
+    private string GetFieldValue(string key) =>
+        FormValues.TryGetValue(key, out var v) ? v : "";
+
+    private void SetFieldValue(string key, string value)
+    {
+        FormValues[key] = value;
+        if (_fieldErrors.ContainsKey(key))
+            _fieldErrors[key] = null;
+        StateHasChanged(); 
+    }
+    
+    private string GetInputClass(string? error) =>
+        $"w-full rounded-xl border px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:border-transparent " +
+        (error != null
+            ? "border-red-300 bg-red-50 focus:ring-red-400"
+            : "border-slate-200 bg-white focus:ring-indigo-500");
+
+    private async Task Validate()
+    {
+        Console.WriteLine("haha1");
+        _fieldErrors.Clear();
+        if (_sections != null)
+        {
+            foreach (var section in _sections.Where(s => s.Fields != null && EvaluateCondition(s.DisplayCondition)))
+            {
+                foreach (var field in section.Fields!.Where(f => EvaluateCondition(f.DisplayCondition)))
+                {
+                    if (field.Required && string.IsNullOrWhiteSpace(GetFieldValue(field.Key)))
+                        _fieldErrors[field.Key] = $"{field.Label} est obligatoire.";
+                }
+            }
+        }
+        Console.WriteLine("haha");
+        Console.WriteLine(_fieldErrors);
+        if (_fieldErrors.All(e => e.Value == null))
+            await OnNext.InvokeAsync(new Dictionary<string, string>(FormValues));
+    }
+
+    // ── Records ──────────────────────────────────────────────────────────────
+    private record SchemaOption(string Value, string Label);
+    private record FieldCondition(string Field, string Operator, string Value);
+    private record SchemaSection(string Key, string Title, List<SchemaField>? Fields, FieldCondition? DisplayCondition);
+    private record SchemaField(string Key, string Label, string Type, bool Required,
+                               string? Placeholder, string? Hint,
+                               List<SchemaOption>? Options, FieldCondition? DisplayCondition);
+}

@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Security.Claims;
+using InClassBff.Api.Auth;
 using InClassBff.Api.Proxy;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -62,6 +63,7 @@ builder.Services.AddAuthentication(options =>
     options.Scope.Add("openid");
     options.Scope.Add("profile");
     options.Scope.Add("email");
+    options.Scope.Add("offline_access"); 
     options.Scope.Add("inclass-roles");
     options.Scope.Add("inclass-profile");
 
@@ -97,7 +99,8 @@ builder.Services.AddAuthentication(options =>
         }
     };
 });
-
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<TokenRefreshService>();
 // ── Wire up SessionStore via PostConfigure ─────────────────────────────────────
 // Cannot use `app` variable here (not built yet), so PostConfigure is the correct approach
 builder.Services
@@ -120,10 +123,14 @@ builder.Services.AddReverseProxy()
     {
         transformBuilder.AddRequestTransform(async context =>
         {
-            // Skip token injection for anonymous public routes
             if (context.HttpContext.Request.Path.StartsWithSegments("/public"))
                 return;
+            
+            var refreshService = context.HttpContext.RequestServices
+                .GetRequiredService<TokenRefreshService>();
+            await refreshService.TryRefreshTokensAsync(context.HttpContext);
 
+            // Always read the token AFTER the potential refresh
             var accessToken = await context.HttpContext.GetTokenAsync("access_token");
             if (!string.IsNullOrEmpty(accessToken))
             {
@@ -137,8 +144,8 @@ builder.Services.AddControllers();
 var app = builder.Build();
 
 app.UseHttpsRedirection();
-app.UseBlazorFrameworkFiles();   // serves _framework/, _content/ etc.
-app.UseStaticFiles();            // serves everything else in wwwroot
+app.UseBlazorFrameworkFiles();   
+app.UseStaticFiles();            
 
 app.UseRouting();  
 // ── Middleware pipeline ────────────────────────────────────────────────────────

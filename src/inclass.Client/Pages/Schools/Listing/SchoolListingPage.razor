@@ -1,0 +1,226 @@
+﻿@* SchoolListingPage.razor *@
+@page "/SchoolListingPage"
+@using Contract.InClass.Common
+@using Contract.InClass.Response.School
+@using inclass.Client.Components.School.Listing
+@using inclass.Client.Services.Schools.Listing
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Écoles — InClass</PageTitle>
+
+@* Mobile: stack; Desktop: two-column *@
+<div class="flex h-[calc(100vh-64px)] bg-slate-50 overflow-hidden">
+
+    @* ── LEFT COLUMN (40%) ── *@
+    <div class="flex flex-col w-full lg:w-2/5 border-r border-slate-200 bg-white overflow-hidden shrink-0">
+
+        @* Filter bar — sticky *@
+        <SchoolSearchFilter
+            Cities="@_cities"
+            ResultCount="@_filtered.Count"
+            OnFilterChange="@ApplyFilter" />
+
+        @* School card list *@
+        <div class="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2" id="school-card-list">
+            @if (_filtered.Count == 0)
+            {
+                <div class="flex flex-col items-center justify-center h-64 text-center text-slate-400 text-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 mb-3 text-slate-200" fill="none"
+                         viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                              d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Aucune école ne correspond à vos critères.
+                </div>
+            }
+            else
+            {
+                @foreach (var school in _paginated)
+                {
+                    <SchoolCard
+                        School="@school"
+                        IsSelected="@(_selected?.SchoolId == school.SchoolId)"
+                        OnSelect="@(() => SelectSchool(school))"
+                        OnEnroll="@(() => Nav.NavigateTo($"/enroll/{school.SchoolId}"))" />
+                }
+            }
+        </div>
+
+        @* Pagination *@
+        @if (_totalPages > 1)
+        {
+            <div class="flex items-center justify-center gap-2 py-3 border-t border-slate-100 bg-white">
+                <button class="text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition"
+                        disabled="@(_page == 1)" @onclick="PrevPage">
+                    ← Précédent
+                </button>
+                <span class="text-xs text-slate-500">Page @_page / @_totalPages</span>
+                <button class="text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition"
+                        disabled="@(_page == _totalPages)" @onclick="NextPage">
+                    Suivant →
+                </button>
+            </div>
+        }
+    </div>
+
+    @* ── RIGHT COLUMN (60%) — hidden on mobile until card selected ── *@
+    <div class="hidden lg:flex flex-col flex-1 overflow-hidden">
+        <div class="flex-1 overflow-y-auto p-6" id="detail-panel">
+            <SchoolDetailWidget School="@_selected" />
+        </div>
+    </div>
+
+    @* ── MOBILE BOTTOM SHEET ── *@
+    @if (_selected is not null && _mobileSheetOpen)
+    {
+        <div class="fixed inset-0 z-40 lg:hidden" @onclick="CloseMobileSheet">
+            <div class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+            <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl max-h-[85vh] flex flex-col"
+                 @onclick:stopPropagation="true">
+                @* Handle *@
+                <div class="flex justify-center pt-3 pb-2">
+                    <div class="w-10 h-1 rounded-full bg-slate-300"></div>
+                </div>
+                <div class="flex-1 overflow-y-auto px-5 pb-6">
+                    <SchoolDetailWidget School="@_selected" />
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private const int PageSize = 10;
+
+    private List<SchoolSummaryDto> _schools = new()
+    {
+        new SchoolSummaryDto(
+            Guid.Parse("ad20f69e-3721-468b-a077-7813d7c95a5f"),
+            "École Al Amal", "مدرسة الأمل", "Tanger",
+            "Une école privée de référence à Tanger offrant un enseignement de qualité de la maternelle au primaire.",
+            35.7818783, -5.850713,
+            new GradeLevelOfferingDto(true, true, false, false),
+            new List<SchoolPictureResponse>(),
+            new List<OpenSessionSummaryDto>
+            {
+                new(Guid.NewGuid(), Guid.NewGuid(),
+                    "Petite section", "القسم الصغير",
+                    "Cycle préscolaire", "التعليم ما قبل المدرسي",
+                    DateTime.UtcNow.AddDays(-4), DateTime.UtcNow.AddDays(2),
+                    40, 31, 5),
+                new(Guid.NewGuid(), Guid.NewGuid(),
+                    "Grande section", "القسم الكبير",
+                    "Cycle préscolaire", "التعليم ما قبل المدرسي",
+                    DateTime.UtcNow.AddDays(-4), DateTime.UtcNow.AddDays(10),
+                    30, 10, 8),
+                new(Guid.NewGuid(), Guid.NewGuid(),
+                    "1ère année primaire", "السنة الأولى ابتدائي",
+                    "Cycle primaire", "التعليم الابتدائي",
+                    DateTime.UtcNow.AddDays(-4), DateTime.UtcNow.AddDays(10),
+                    35, 5, 2)
+            }),
+
+        new SchoolSummaryDto(
+            Guid.Parse("07ded9dc-17a8-4647-a0cb-fa1fb9fc80ad"),
+            "Institut Ibn Khaldoun", "معهد ابن خلدون", "Tétouan",
+            "Institut privé d'excellence couvrant le cycle primaire, collégial et lycéen.",
+            35.5785, -5.3684,
+            new GradeLevelOfferingDto(false, true, true, true),
+            new List<SchoolPictureResponse>(),
+            new List<OpenSessionSummaryDto>()),
+
+        new SchoolSummaryDto(
+            Guid.NewGuid(),
+            "École Les Étoiles", "مدرسة النجوم", "Tanger",
+            null,
+            35.7695, -5.8340,
+            new GradeLevelOfferingDto(true, false, false, false),
+            new List<SchoolPictureResponse>(),
+            new List<OpenSessionSummaryDto>
+            {
+                new(Guid.NewGuid(), Guid.NewGuid(),
+                    "Moyenne section", "القسم المتوسط",
+                    "Cycle préscolaire", "التعليم ما قبل المدرسي",
+                    DateTime.UtcNow.AddDays(-10), DateTime.UtcNow.AddDays(20),
+                    25, 25, 0)
+            }),
+
+        new SchoolSummaryDto(
+            Guid.NewGuid(),
+            "Académie Al Farabi", "أكاديمية الفارابي", "Tanger",
+            "Académie internationale proposant le cycle collégial et lycéen avec option bilingue.",
+            35.7750, -5.8100,
+            new GradeLevelOfferingDto(false, false, true, true),
+            new List<SchoolPictureResponse>(),
+            new List<OpenSessionSummaryDto>())
+    };
+
+    private List<SchoolSummaryDto> _filtered = new();
+    private List<SchoolSummaryDto> _paginated = new();
+    private SchoolSummaryDto? _selected;
+    private List<string> _cities = new();
+    private SchoolFilter _currentFilter = new("", "", false, false, false, false);
+    private int _page = 1;
+    private int _totalPages = 1;
+    private bool _mobileSheetOpen;
+
+    protected override void OnInitialized()
+    {
+        _cities = _schools.Select(s => s.City).Distinct().OrderBy(c => c).ToList();
+        _filtered = _schools.ToList();
+        Paginate();
+        SelectSchool(_schools.First());
+    }
+
+    private void ApplyFilter(SchoolFilter filter)
+    {
+        _currentFilter = filter;
+        _page = 1;
+
+        _filtered = _schools.Where(s =>
+        {
+            if (!string.IsNullOrWhiteSpace(filter.SearchText) &&
+                !s.Name.Contains(filter.SearchText, StringComparison.OrdinalIgnoreCase) &&
+                !(s.ArName?.Contains(filter.SearchText, StringComparison.OrdinalIgnoreCase) ?? false))
+                return false;
+
+            if (!string.IsNullOrWhiteSpace(filter.City) && s.City != filter.City)
+                return false;
+
+            var anyGrade = filter.PreSchool || filter.Primary || filter.Middle || filter.High;
+            if (anyGrade)
+            {
+                var match =
+                    (filter.PreSchool && s.GradeLevelOffering.HasPreSchool) ||
+                    (filter.Primary && s.GradeLevelOffering.HasPrimarySchool) ||
+                    (filter.Middle && s.GradeLevelOffering.HasMiddleSchool) ||
+                    (filter.High && s.GradeLevelOffering.HasHighSchool);
+                if (!match) return false;
+            }
+
+            return true;
+        }).ToList();
+
+        Paginate();
+    }
+
+    private void Paginate()
+    {
+        _totalPages = Math.Max(1, (int)Math.Ceiling(_filtered.Count / (double)PageSize));
+        _page = Math.Clamp(_page, 1, _totalPages);
+        _paginated = _filtered.Skip((_page - 1) * PageSize).Take(PageSize).ToList();
+    }
+
+    private void SelectSchool(SchoolSummaryDto school)
+    {
+        _selected = school;
+        _mobileSheetOpen = true;
+        JS.InvokeVoidAsync("scrollToTop", "detail-panel");
+    }
+
+    private void CloseMobileSheet() => _mobileSheetOpen = false;
+
+    private void PrevPage() { _page--; Paginate(); }
+    private void NextPage() { _page++; Paginate(); }
+}

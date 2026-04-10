@@ -1,0 +1,159 @@
+﻿@using Contract.InClass.Response.School
+@* SchoolCard.razor *@
+
+<div class="@CardClasses" @onclick="OnCardClick" role="button" tabindex="0"
+     @onkeydown="HandleKeyDown" style="cursor:pointer;">
+
+    @* Left border accent for selected state *@
+    @if (IsSelected)
+    {
+        <div class="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 rounded-l-xl"></div>
+    }
+
+    <div class="flex gap-3 items-start">
+        @* School picture or initials avatar *@
+        <div class="shrink-0">
+            @if (MainPicture is not null)
+            {
+                <img src="@MainPicture.Url" alt="@School.Name"
+                     class="w-14 h-14 rounded-xl object-cover shadow-sm" />
+            }
+            else
+            {
+                <div class="w-14 h-14 rounded-xl flex items-center justify-center text-lg font-bold text-white shadow-sm @AvatarColor">
+                    @Initials
+                </div>
+            }
+        </div>
+
+        <div class="flex-1 min-w-0">
+            @* Name *@
+            <p class="font-semibold text-slate-800 text-sm leading-tight truncate">@School.Name</p>
+            @if (!string.IsNullOrWhiteSpace(School.ArName))
+            {
+                <p class="text-xs text-slate-400 mt-0.5 truncate" dir="rtl" lang="ar">@School.ArName</p>
+            }
+
+            @* City *@
+            <div class="flex items-center gap-1 mt-1 text-xs text-slate-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 shrink-0 text-slate-400" fill="none"
+                     viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                @School.City
+            </div>
+
+            @* Grade level pills *@
+            <div class="flex flex-wrap gap-1 mt-2">
+                @if (School.GradeLevelOffering.HasPreSchool)
+                {
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium">Préscolaire</span>
+                }
+                @if (School.GradeLevelOffering.HasPrimarySchool)
+                {
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">Primaire</span>
+                }
+                @if (School.GradeLevelOffering.HasMiddleSchool)
+                {
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Collège</span>
+                }
+                @if (School.GradeLevelOffering.HasHighSchool)
+                {
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">Lycée</span>
+                }
+            </div>
+        </div>
+    </div>
+
+    @* Enrollment status *@
+    <div class="mt-3 pt-3 border-t border-slate-100">
+        @if (School.OpenSessions.Count > 0)
+        {
+            <div class="flex items-center gap-2">
+                @* Pulsing green dot *@
+                <span class="relative flex h-2.5 w-2.5 shrink-0">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    Inscriptions ouvertes — @School.OpenSessions.Count niveau@(School.OpenSessions.Count > 1 ? "x" : "") disponible@(School.OpenSessions.Count > 1 ? "s" : "")
+                </span>
+            </div>
+
+            @* Grade chips preview *@
+            <div class="flex flex-wrap gap-1.5 mt-2 items-center">
+                @foreach (var session in School.OpenSessions.Take(3))
+                {
+                    <span class="text-xs bg-slate-100 text-slate-600 rounded-full px-2 py-0.5 flex items-center gap-1">
+                        <span>@session.GradeName_Fr</span>
+                        <span class="text-slate-300">•</span>
+                        <span class="text-slate-400" dir="rtl" lang="ar">@session.GradeName_Ar</span>
+                    </span>
+                }
+                @if (School.OpenSessions.Count > 3)
+                {
+                    <span class="text-xs text-slate-400 font-medium">+@(School.OpenSessions.Count - 3) autres</span>
+                }
+            </div>
+        }
+        else
+        {
+            <span class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Pas d'inscriptions actives</span>
+        }
+    </div>
+
+    @* Card footer *@
+    <div class="mt-3 flex items-center justify-between">
+        <button class="text-xs text-indigo-600 hover:text-indigo-800 font-medium hover:underline transition"
+                @onclick:stopPropagation="true" @onclick="OnCardClick">
+            Voir les détails →
+        </button>
+        @if (School.OpenSessions.Count > 0)
+        {
+            <button class="text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg transition shadow-sm"
+                    @onclick:stopPropagation="true" @onclick="NavigateToEnroll">
+                S'inscrire
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SchoolSummaryDto School { get; set; } = default!;
+    [Parameter] public bool IsSelected { get; set; }
+    [Parameter] public EventCallback OnSelect { get; set; }
+    [Parameter] public EventCallback OnEnroll { get; set; }
+
+    private SchoolPictureResponse? MainPicture =>
+        School.Pictures.FirstOrDefault(p => p.IsMain) ?? School.Pictures.FirstOrDefault();
+
+    private string Initials =>
+        string.Join("", School.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Take(2).Select(w => char.ToUpper(w[0])));
+
+    private string[] AvatarColors = new[]
+    {
+        "bg-indigo-500", "bg-violet-500", "bg-teal-500",
+        "bg-rose-500", "bg-amber-500", "bg-cyan-600"
+    };
+
+    private string AvatarColor =>
+        AvatarColors[Math.Abs(School.SchoolId.GetHashCode()) % AvatarColors.Length];
+
+    private string CardClasses =>
+        $"relative p-4 rounded-xl border transition-all duration-150 {(IsSelected
+            ? "border-indigo-300 bg-indigo-50/60 shadow-md pl-5"
+            : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm")}";
+
+    private async Task OnCardClick() => await OnSelect.InvokeAsync();
+    private async Task NavigateToEnroll() => await OnEnroll.InvokeAsync();
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" || e.Key == " ")
+            await OnCardClick();
+    }
+}
