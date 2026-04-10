@@ -1,0 +1,107 @@
+﻿@using System
+@using Contract.InClass.Response.Registration
+
+<div class="flex flex-col items-center text-center space-y-6 py-4">
+
+    @* Success icon *@
+    <div class="flex items-center justify-center w-20 h-20 rounded-full bg-emerald-100">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+    </div>
+
+    @* Title *@
+    <div class="space-y-1.5">
+        <h3 class="text-xl font-bold text-slate-900">Demande soumise avec succès !</h3>
+        <p class="text-slate-500 text-sm max-w-sm mx-auto">
+            Votre demande a bien été enregistrée pour
+            <span class="font-semibold text-slate-700">@Session.GradeName_Fr</span>
+            à <span class="font-semibold text-slate-700">@SchoolName</span>.
+        </p>
+    </div>
+
+    @* Reference box *@
+    <div class="w-full max-w-sm rounded-2xl bg-slate-900 text-white p-5 text-left space-y-1.5">
+        <p class="text-xs text-slate-400 uppercase tracking-widest font-medium">Numéro de référence</p>
+        <div class="flex items-center justify-between gap-3">
+            <p class="font-mono font-bold text-lg tracking-wide text-emerald-400 break-all">
+                @ApplicationId.ToString().ToUpperInvariant()[..8]
+            </p>
+            <span class="font-mono font-bold tracking-widest text-indigo-700">@IdentityKey</span>
+            <button @onclick="CopyToClipboard"
+                    class="shrink-0 flex items-center gap-1.5 text-xs text-slate-300 hover:text-white transition-colors px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700">
+                @if (_copied)
+                {
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span class="text-emerald-400">Copié</span>
+                }
+                else
+                {
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    <span>Copier</span>
+                }
+            </button>
+        </div>
+        <p class="text-xs text-slate-400 font-mono">@ApplicationId</p>
+    </div>
+
+    @* Note about reference *@
+    <div class="flex gap-3 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 max-w-sm w-full text-left">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <div class="text-sm text-amber-700">
+            <p class="font-semibold">Conservez ce numéro</p>
+            <p class="mt-0.5">Il vous sera demandé pour toute réinscription future ou suivi de dossier.</p>
+        </div>
+    </div>
+
+    @* Processing info *@
+    <p class="text-sm text-slate-400 max-w-sm">
+        Vous serez contacté(e) par l'école pour la suite du processus.
+    </p>
+
+    @* Actions *@
+    <div class="flex flex-col sm:flex-row items-center gap-3 w-full max-w-sm">
+        <button @onclick="OnEnrollAnother"
+                class="w-full order-2 sm:order-1 px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium transition-colors">
+            Inscrire un autre élève
+        </button>
+        <button @onclick="OnClose"
+                class="w-full order-1 sm:order-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors shadow-sm">
+            Fermer
+        </button>
+    </div>
+</div>
+
+@inject IJSRuntime JS
+
+@code {
+    
+    [Parameter] public string IdentityKey { get; set; } = "";  // ← add
+    [Parameter] public EnrollmentSessionDto Session { get; set; } = default!;
+    [Parameter] public string SchoolName { get; set; } = "";
+    [Parameter] public Guid ApplicationId { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnEnrollAnother { get; set; }
+
+    private bool _copied = false;
+
+    private async Task CopyToClipboard()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", ApplicationId.ToString());
+            _copied = true;
+            StateHasChanged();
+            await Task.Delay(2000);
+            _copied = false;
+            StateHasChanged();
+        }
+        catch { /* clipboard not available */ }
+    }
+}

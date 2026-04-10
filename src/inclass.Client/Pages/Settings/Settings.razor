@@ -1,38 +1,42 @@
 ﻿@page "/settings"
 @layout DashboardLayout
 @using inclass.Client.Components.Settings
+@using inclass.Client.Components.Settings.Classroom
 @using Microsoft.AspNetCore.Components.Web
 
-<div class="min-h-screen bg-zinc-100 font-sans">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-        <div class="mb-6">
+<div class="h-screen bg-zinc-100 flex flex-col font-sans overflow-hidden">
+    <div class="flex-1 min-h-0 w-full flex flex-col">
+        <!-- Header section -->
+        <div class="mb-1 bg-white px-5 py-3">
             <h1 class="text-xl font-semibold text-zinc-900 tracking-tight">Paramètres</h1>
             <p class="mt-1 text-[13px] text-zinc-400">Gérez la configuration de votre établissement</p>
         </div>
 
-        <div class="flex flex-col lg:flex-row gap-5">
-
-            @* Sidebar — mobile horizontal, desktop vertical *@
-            <aside class="lg:w-56 shrink-0">
+        <!-- Main row: sidebar + content, both stretch to fill remaining height -->
+        <div class="flex flex-col lg:flex-row gap-1 flex-1 min-h-0">
+            <!-- Sidebar - full height on desktop, horizontal scroll on mobile -->
+            <aside class="lg:w-56 shrink-0 lg:flex lg:flex-col">
+                <!-- Mobile: horizontal tabs -->
                 <div class="lg:hidden flex gap-2 overflow-x-auto pb-2">
                     @foreach (var t in _tabs)
                     {
                         <button @onclick="() => _active = t.Id"
-                            class="@(_active == t.Id ? "bg-indigo-600 text-white" : "bg-white text-zinc-600 border border-zinc-200") flex items-center gap-2 whitespace-nowrap px-3.5 py-2 rounded-full text-[13px] font-medium transition-all shrink-0">
+                                class="@(_active == t.Id ? "bg-indigo-600 text-white" : "bg-white text-zinc-600 border border-zinc-200") flex items-center gap-2 whitespace-nowrap px-3.5 py-2 rounded-full text-[13px] font-medium transition-all shrink-0">
                             <span>@t.Icon</span><span>@t.Label</span>
                         </button>
                     }
                 </div>
-                <nav class="hidden lg:block bg-white rounded-xl border border-zinc-200 shadow-xs overflow-hidden">
+
+                <!-- Desktop: vertical navigation, stretches full height -->
+                <nav class="hidden lg:flex lg:flex-col bg-white overflow-y-auto flex-1">
                     @foreach (var t in _tabs)
                     {
                         <button @onclick="() => _active = t.Id"
-                            class="@(_active == t.Id
-                                ? "bg-indigo-50 text-indigo-700 border-l-2 border-indigo-500"
-                                : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 border-l-2 border-transparent")
-                                w-full flex items-center gap-3 px-4 py-3 text-[13px] font-medium transition-all text-left border-b border-zinc-100 last:border-0">
-                            <span class="text-base">@t.Icon</span>
+                                class="@(_active == t.Id
+                                    ? "bg-indigo-50 text-indigo-700 border-l-2 border-indigo-500"
+                                    : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 border-l-2 border-transparent")
+                                    w-full flex items-center gap-3 px-4 py-3 text-[13px] font-medium transition-all text-left border-b border-zinc-100 last:border-0">
+                            <i class="@t.Icon"></i>
                             <span>@t.Label</span>
                             @if (t.Id == "danger")
                             {
@@ -43,15 +47,15 @@
                 </nav>
             </aside>
 
-            <main class="flex-1 min-w-0">
-                @switch (_active)
-                {
-                    case "schema":        <SchemaManagementTab /> break;
-                    case "notifications": <PlaceholderTab Icon="🔔" Title="Notifications"  Description="Configurez vos préférences de notifications." /> break;
-                    case "billing":       <PlaceholderTab Icon="💳" Title="Facturation"    Description="Gérez abonnements et factures." /> break;
-                    case "integrations":  <PlaceholderTab Icon="🔗" Title="Intégrations"   Description="Connectez des outils tiers." /> break;
-                    case "danger":        <PlaceholderTab Icon="⚠️" Title="Zone de danger" Description="Actions irréversibles." IsDanger="true" /> break;
-                }
+            <!-- Main content area - white card with scrollable content -->
+            <main class="flex-1 min-h-0 min-w-0 flex flex-col">
+                <div class="bg-white  flex-1 overflow-y-auto p-4">
+                    @switch (_active)
+                    {
+                        case "schema":        <SchemaManagementTab /> break;
+                        case "classroom":     <ClassroomManagementTab /> break;
+                    }
+                </div>
             </main>
         </div>
     </div>
@@ -62,10 +66,7 @@
     private record Tab(string Id, string Icon, string Label);
     private readonly List<Tab> _tabs = new()
     {
-        new("schema",        "🗂️",  "Gestion des schémas"),
-        new("notifications", "🔔",  "Notifications"),
-        new("billing",       "💳",  "Facturation"),
-        new("integrations",  "🔗",  "Intégrations"),
-        new("danger",        "⚠️",  "Zone de danger"),
+        new("schema", "fa-solid fa-folder-tree", "Gestion des schémas"),
+        new("classroom", "fa-solid fa-chalkboard-user", "ClassRoom"),
     };
 }

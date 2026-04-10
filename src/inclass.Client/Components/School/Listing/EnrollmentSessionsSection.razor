@@ -1,0 +1,107 @@
+﻿@using Contract.InClass.Response.School
+@* EnrollmentSessionsSection.razor *@
+
+<div class="mt-6">
+    <div class="flex items-center gap-2 mb-4">
+        @if (Sessions.Count > 0)
+        {
+            <span class="relative flex h-2.5 w-2.5 shrink-0">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+        }
+        <h3 class="text-sm font-semibold text-slate-700 uppercase tracking-wider">Sessions d'inscription</h3>
+    </div>
+
+    @if (Sessions.Count == 0)
+    {
+        <div class="rounded-xl bg-slate-50 border border-slate-200 p-5 text-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 mx-auto mb-2 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <p class="text-sm text-slate-400">Aucune session d'inscription active pour le moment</p>
+        </div>
+    }
+    else
+    {
+        @* Group by cycle *@
+        @foreach (var cycleGroup in Sessions.GroupBy(s => s.CycleName_Fr))
+        {
+            <div class="mb-5">
+                @* Cycle header *@
+                <div class="mb-3">
+                    <p class="text-sm font-semibold text-slate-800">@cycleGroup.Key</p>
+                    <p class="text-xs text-slate-400" dir="rtl" lang="ar">
+                        @cycleGroup.First().CycleName_Ar
+                    </p>
+                </div>
+
+                <div class="flex flex-col gap-3">
+                    @foreach (var session in cycleGroup)
+                    {
+                        var filled = session.ReservedCount + session.EnrolledCount;
+                        var pct = session.MaxSlots > 0
+                            ? Math.Min(100, (int)Math.Round((double)filled / session.MaxSlots * 100))
+                            : 0;
+                        var available = session.MaxSlots - filled;
+                        var statusInfo = GetStatusInfo(session);
+
+                        <div class="rounded-xl border @statusInfo.BorderClass bg-white p-4 shadow-sm">
+                            @* Grade name *@
+                            <div class="flex items-start justify-between gap-2 mb-3">
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-800">@session.GradeName_Fr</p>
+                                    <p class="text-xs text-slate-400 mt-0.5" dir="rtl" lang="ar">@session.GradeName_Ar</p>
+                                </div>
+                                <span class="shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full @statusInfo.BadgeClass">
+                                    @statusInfo.Label
+                                </span>
+                            </div>
+
+                            @* Progress bar *@
+                            <div class="mb-2">
+                                <div class="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                    <div class="h-full rounded-full transition-all duration-500 @statusInfo.BarClass"
+                                         style="width: @(pct)%"></div>
+                                </div>
+                                <p class="text-xs text-slate-500 mt-1">
+                                    <span class="font-medium text-slate-700">@available</span> place@(available != 1 ? "s" : "") disponible@(available != 1 ? "s" : "")
+                                    <span class="text-slate-300 mx-1">·</span>
+                                    @filled/@session.MaxSlots occupée@(filled != 1 ? "s" : "")
+                                </p>
+                            </div>
+
+                            @* Period *@
+                            <p class="text-xs text-slate-400">
+                                Du <span class="font-medium text-slate-600">@session.OpenDate.ToString("dd/MM/yyyy")</span>
+                                au <span class="font-medium text-slate-600">@(session.CloseDate?.ToString("dd/MM/yyyy") ?? "—")</span>
+                            </p>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public List<OpenSessionSummaryDto> Sessions { get; set; } = new();
+
+    private (string Label, string BadgeClass, string BorderClass, string BarClass) GetStatusInfo(OpenSessionSummaryDto s)
+    {
+        var filled = s.ReservedCount + s.EnrolledCount;
+        var isFull = filled >= s.MaxSlots;
+        var isClosed = s.CloseDate.HasValue && s.CloseDate.Value < DateTime.UtcNow;
+        var isClosingSoon = !isClosed && s.CloseDate.HasValue &&
+                            (s.CloseDate.Value - DateTime.UtcNow).TotalDays < 3;
+
+        if (isClosed)
+            return ("Fermée", "bg-slate-100 text-slate-500", "border-slate-200", "bg-slate-400");
+        if (isFull)
+            return ("Complet", "bg-red-100 text-red-600", "border-red-200", "bg-red-500");
+        if (isClosingSoon)
+            return ("Ferme bientôt", "bg-amber-100 text-amber-700", "border-amber-200", "bg-amber-400");
+        return ("Ouvert", "bg-emerald-100 text-emerald-700", "border-emerald-200", "bg-emerald-500");
+    }
+}

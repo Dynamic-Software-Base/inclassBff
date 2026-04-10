@@ -22,6 +22,9 @@ public class ApiClient
     public Task<ApiResponse<T>> PutAsync<T>(string url, object body) =>
         SendAsync<T>(HttpMethod.Put, url, body);
 
+    public Task<ApiResponse<T>> PatchAsync<T>(string url, object body) =>
+        SendAsync<T>(HttpMethod.Patch, url, body);
+    
     public Task<ApiResponse<T>> DeleteAsync<T>(string url) =>
         SendAsync<T>(HttpMethod.Delete, url);
     private static readonly JsonSerializerOptions JsonOptions = new()

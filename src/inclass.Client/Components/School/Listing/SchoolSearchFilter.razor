@@ -1,0 +1,354 @@
+﻿@using inclass.Client.Services.Schools.Listing
+@* SchoolSearchFilter.razor — Redesigned *@
+
+<div class="filter-bar">
+
+    @* Search *@
+    <div class="search-wrap">
+        <span class="search-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="11" cy="11" r="7" stroke-width="1.8" />
+                <path d="M21 21l-4.35-4.35" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
+        </span>
+        <input
+            type="text"
+            placeholder="Rechercher une école…"
+            class="search-input"
+            @bind="SearchText"
+            @bind:event="oninput"
+            @bind:after="OnFilterChanged" />
+        @if (!string.IsNullOrWhiteSpace(SearchText))
+        {
+            <button class="search-clear" @onclick="ClearSearch">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M18 6L6 18M6 6l12 12" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+            </button>
+        }
+    </div>
+
+    @* Second row: city + grade filters *@
+    <div class="filter-row">
+
+        @* City selector *@
+        <div class="city-select-wrap">
+            <svg class="city-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                      d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
+                <circle cx="12" cy="9" r="2" stroke-width="1.5" />
+            </svg>
+            <select class="city-select"
+                    @bind="SelectedCity"
+                    @bind:after="OnFilterChanged">
+                <option value="">Toutes les villes</option>
+                @foreach (var city in Cities)
+                {
+                    <option value="@city">@city</option>
+                }
+            </select>
+            <svg class="select-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M6 9l6 6 6-6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+
+        @* Grade pills *@
+        <div class="grade-pills">
+            <label class="pill pill--preschool @(FilterPreSchool ? "pill--active" : "")">
+                <input type="checkbox" class="pill-check" @bind="FilterPreSchool" @bind:after="OnFilterChanged" />
+                <span>Préscolaire</span>
+            </label>
+            <label class="pill pill--primary @(FilterPrimary ? "pill--active" : "")">
+                <input type="checkbox" class="pill-check" @bind="FilterPrimary" @bind:after="OnFilterChanged" />
+                <span>Primaire</span>
+            </label>
+            <label class="pill pill--middle @(FilterMiddle ? "pill--active" : "")">
+                <input type="checkbox" class="pill-check" @bind="FilterMiddle" @bind:after="OnFilterChanged" />
+                <span>Collège</span>
+            </label>
+            <label class="pill pill--high @(FilterHigh ? "pill--active" : "")">
+                <input type="checkbox" class="pill-check" @bind="FilterHigh" @bind:after="OnFilterChanged" />
+                <span>Lycée</span>
+            </label>
+        </div>
+    </div>
+
+    @* Result count bar *@
+    <div class="result-bar">
+        <span class="result-count">@ResultCount</span>
+        <span class="result-label">
+            école@(ResultCount != 1 ? "s" : "") trouvée@(ResultCount != 1 ? "s" : "")
+        </span>
+        @if (FilterPreSchool || FilterPrimary || FilterMiddle || FilterHigh || !string.IsNullOrWhiteSpace(SelectedCity))
+        {
+            <button class="reset-btn" @onclick="ResetFilters">
+                Réinitialiser les filtres
+            </button>
+        }
+    </div>
+</div>
+
+<style>
+    /* ── Filter bar shell ── */
+    .filter-bar {
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+        padding: 1rem 1rem 0.75rem;
+        background: #ffffff;
+        border-bottom: 1px solid #ece8f6;
+        position: sticky;
+        top: 0;
+        z-index: 20;
+    }
+
+    /* ── Search ── */
+    .search-wrap {
+        position: relative;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 0.875rem;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        pointer-events: none;
+    }
+
+    .search-icon svg {
+        width: 1rem;
+        height: 1rem;
+        stroke: #9b8ec4;
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 0.6rem 2.5rem 0.6rem 2.6rem;
+        font-size: 0.82rem;
+        font-family: 'DM Sans', 'Outfit', sans-serif;
+        background: #f7f5fc;
+        border: 1.5px solid #e4dff5;
+        border-radius: 0.75rem;
+        color: #2d2150;
+        outline: none;
+        transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
+        box-sizing: border-box;
+    }
+
+    .search-input::placeholder {
+        color: #b8acdc;
+    }
+
+    .search-input:focus {
+        background: #ffffff;
+        border-color: #8b72d4;
+        box-shadow: 0 0 0 3px rgba(139, 114, 212, 0.12);
+    }
+
+    .search-clear {
+        position: absolute;
+        right: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.25rem;
+        height: 1.25rem;
+        border-radius: 50%;
+        background: #e4dff5;
+        border: none;
+        cursor: pointer;
+        transition: background 0.15s;
+        padding: 0;
+    }
+
+    .search-clear:hover {
+        background: #d4cef0;
+    }
+
+    .search-clear svg {
+        width: 0.7rem;
+        height: 0.7rem;
+        stroke: #6d54b5;
+        stroke-width: 2.5;
+    }
+
+    /* ── Filter row ── */
+    .filter-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    /* ── City selector ── */
+    .city-select-wrap {
+        position: relative;
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+    }
+
+    .city-icon {
+        position: absolute;
+        left: 0.6rem;
+        width: 0.85rem;
+        height: 0.85rem;
+        stroke: #9b8ec4;
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    .city-select {
+        appearance: none;
+        -webkit-appearance: none;
+        padding: 0.45rem 2rem 0.45rem 1.9rem;
+        font-size: 0.78rem;
+        font-family: inherit;
+        background: #f7f5fc;
+        border: 1.5px solid #e4dff5;
+        border-radius: 0.65rem;
+        color: #3d2f6b;
+        outline: none;
+        cursor: pointer;
+        transition: border-color 0.18s, box-shadow 0.18s;
+    }
+
+    .city-select:focus {
+        border-color: #8b72d4;
+        box-shadow: 0 0 0 3px rgba(139, 114, 212, 0.12);
+        background: #fff;
+    }
+
+    .select-arrow {
+        position: absolute;
+        right: 0.5rem;
+        width: 0.85rem;
+        height: 0.85rem;
+        stroke: #9b8ec4;
+        pointer-events: none;
+    }
+
+    /* ── Grade pills ── */
+    .grade-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+    }
+
+    .pill {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.35rem 0.7rem;
+        border-radius: 999px;
+        font-size: 0.73rem;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1.5px solid transparent;
+        transition: all 0.18s;
+        user-select: none;
+        background: #f4f2fb;
+        color: #7c6fa0;
+    }
+
+    .pill-check {
+        display: none;
+    }
+
+    /* Color variants — inactive */
+    .pill--preschool { background: #f4f0fc; color: #8b5cf6; border-color: #e9e0fa; }
+    .pill--primary   { background: #eff6ff; color: #3b82f6; border-color: #dbeafe; }
+    .pill--middle    { background: #fffbeb; color: #d97706; border-color: #fde68a; }
+    .pill--high      { background: #f0fdf4; color: #16a34a; border-color: #bbf7d0; }
+
+    /* Active states */
+    .pill--preschool.pill--active { background: #8b5cf6; color: #fff; border-color: #7c3aed; }
+    .pill--primary.pill--active   { background: #3b82f6; color: #fff; border-color: #2563eb; }
+    .pill--middle.pill--active    { background: #d97706; color: #fff; border-color: #b45309; }
+    .pill--high.pill--active      { background: #16a34a; color: #fff; border-color: #15803d; }
+
+    .pill:hover {
+        filter: brightness(0.96);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    /* ── Result bar ── */
+    .result-bar {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding-top: 0.1rem;
+    }
+
+    .result-count {
+        font-size: 0.85rem;
+        font-weight: 800;
+        color: #6d54b5;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .result-label {
+        font-size: 0.72rem;
+        color: #a89ccc;
+        font-weight: 500;
+    }
+
+    .reset-btn {
+        margin-left: auto;
+        font-size: 0.68rem;
+        font-weight: 600;
+        color: #9b8ec4;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0.2rem 0.5rem;
+        border-radius: 0.4rem;
+        transition: color 0.15s, background 0.15s;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        text-decoration-color: #d4cef0;
+    }
+
+    .reset-btn:hover {
+        color: #6d54b5;
+        background: #f4f0fc;
+        text-decoration-color: #9b8ec4;
+    }
+</style>
+
+@code {
+    [Parameter] public List<string> Cities { get; set; } = new();
+    [Parameter] public int ResultCount { get; set; }
+    [Parameter] public EventCallback<SchoolFilter> OnFilterChange { get; set; }
+
+    private string SearchText { get; set; } = "";
+    private string SelectedCity { get; set; } = "";
+    private bool FilterPreSchool { get; set; }
+    private bool FilterPrimary { get; set; }
+    private bool FilterMiddle { get; set; }
+    private bool FilterHigh { get; set; }
+
+    private async Task OnFilterChanged()
+    {
+        await OnFilterChange.InvokeAsync(new SchoolFilter(
+            SearchText, SelectedCity,
+            FilterPreSchool, FilterPrimary, FilterMiddle, FilterHigh));
+    }
+
+    private async Task ClearSearch()
+    {
+        SearchText = "";
+        await OnFilterChanged();
+    }
+
+    private async Task ResetFilters()
+    {
+        SelectedCity = "";
+        FilterPreSchool = FilterPrimary = FilterMiddle = FilterHigh = false;
+        await OnFilterChanged();
+    }
+}

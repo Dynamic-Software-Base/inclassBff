@@ -1,0 +1,52 @@
+﻿@page "/enroll/{schoolId:guid}"
+@using System.Text.Json
+@using inclass.Client.Components.School.Enroll
+@inject NavigationManager NavigationManager
+
+<div class="min-h-screen bg-slate-50">
+    <div class="max-w-5xl mx-auto px-4 py-8 space-y-8">
+
+        <EnrollPageHeader
+            SchoolName="@_data?.SchoolName"
+            AcademicYear="@_data?.AcademicYear"
+            OnBack="@(() => NavigationManager.NavigateTo("/schools"))" />
+
+        @if (_loading)
+        {
+            <div class="flex items-center justify-center py-24">
+                <div class="flex flex-col items-center gap-3">
+                    <svg class="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 12 0 12 0v4a8 8 0 00-8 8H0z"></path>
+                    </svg>
+                    <span class="text-sm text-slate-500">Chargement des sessions…</span>
+                </div>
+            </div>
+        }
+        else if (_error != null)
+        {
+            <div class="rounded-xl border border-red-200 bg-red-50 p-6 text-center text-red-700">
+                <p class="font-medium">Erreur de chargement</p>
+                <p class="text-sm mt-1">@_error</p>
+            </div>
+        }
+        else if (_data != null)
+        {
+            <SessionListPanel
+                Sessions="@_data.Sessions"
+                OnSessionSelected="@OpenModal" />
+        }
+
+    </div>
+</div>
+
+@if (_modalOpen && _selectedSession != null)
+{
+    <RegistrationModal
+        Session="@_selectedSession"
+        SchoolName="@_data!.SchoolName"
+        AcademicYear="@_data.AcademicYear"
+        SchoolId="@SchoolId"
+        PreSelectedReturning="@_preSelectedReturning"
+        OnClose="@CloseModal" />
+}

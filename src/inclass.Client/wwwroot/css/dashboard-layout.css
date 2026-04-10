@@ -466,7 +466,6 @@
 /* ── Page content ────────────────────────────────────────── */
 .page-content {
     flex: 1;
-    padding: 28px 28px;
     overflow-y: auto;
 }
 

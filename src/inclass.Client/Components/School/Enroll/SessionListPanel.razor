@@ -1,0 +1,39 @@
+﻿@using System.Linq
+@using Contract.InClass.Response.Registration
+@using inclass.Client.Services.Enroll
+
+<div class="space-y-10">
+    @foreach (var cycleGroup in GroupedSessions)
+    {
+        <div class="space-y-4">
+            <div class="flex items-baseline gap-3">
+                <h2 class="text-base font-bold text-slate-800">@cycleGroup.CycleName_Fr</h2>
+                <span class="text-sm text-slate-400 font-normal" dir="rtl">@cycleGroup.CycleName_Ar</span>
+                <div class="flex-1 h-px bg-slate-200 ml-1"></div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                @foreach (var session in cycleGroup.Sessions)
+                {
+                    <SessionCard Session="@session" OnSelect="@OnSessionSelected" />
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<EnrollmentSessionDto> Sessions { get; set; } = new();
+    [Parameter] public EventCallback<SessionSelectedArgs> OnSessionSelected { get; set; }
+
+    private IEnumerable<CycleGroup> GroupedSessions =>
+        Sessions
+            .GroupBy(s => s.CycleId)
+            .Select(g => new CycleGroup(
+                g.First().CycleName_Fr,
+                g.First().CycleName_Ar,
+                g.ToList()
+            ));
+
+    private record CycleGroup(string CycleName_Fr, string CycleName_Ar, List<EnrollmentSessionDto> Sessions);
+}
